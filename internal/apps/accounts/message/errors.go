@@ -12,4 +12,6 @@ var (
 	AdminEmailExists     = messages.NewMessageByError(409_110, "این ایمیل مدیر قبلاً ثبت شده است")
 	AdminInvalidInput    = messages.NewMessageByError(400_110, "اطلاعات مدیر نامعتبر است")
 	AdminInvalidPassword = messages.NewMessageByError(401_110, "ایمیل یا رمز عبور مدیر نادرست است")
+
+	SessionInvalid = messages.NewMessageByError(401_200, "نشست نامعتبر است؛ دوباره وارد شوید.")
 )

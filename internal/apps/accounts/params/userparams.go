@@ -8,11 +8,6 @@ type CreateUserParams struct {
 	Name     string
 }
 
-type LoginUserParams struct {
-	Email    string
-	Password string
-}
-
 type CreateUserUsecaseParams struct {
 	ActorAdminID types.ID
 	CreateUserParams

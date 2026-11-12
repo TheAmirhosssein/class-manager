@@ -12,7 +12,9 @@ import (
 	"time"
 
 	"github.com/TheAmirhosssein/class-manager/config"
+	accountsrouter "github.com/TheAmirhosssein/class-manager/internal/apps/accounts/delivery/http/router"
 	"github.com/TheAmirhosssein/class-manager/internal/infrastructure/database"
+	"github.com/TheAmirhosssein/class-manager/internal/infrastructure/jwt"
 	"github.com/TheAmirhosssein/class-manager/internal/infrastructure/server"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
@@ -48,9 +50,18 @@ func serveCmd() *cobra.Command {
 				return fmt.Errorf("migrate: %w", err)
 			}
 
+			if cfg.JWT.Secret == "" {
+				return fmt.Errorf("JWT_SECRET is required (set in .env or jwt.secret)")
+			}
+			tokens, err := jwt.NewService(cfg.JWT.Secret, cfg.JWT.AccessTTL, cfg.App.Name)
+			if err != nil {
+				return err
+			}
+
 			engine := gin.New()
 			engine.Use(gin.Recovery())
 			server.RegisterHealth(engine, db)
+			accountsrouter.Register(engine, cfg, db, tokens)
 			server.RegisterFrontend(engine, cfg.Frontend.Dir)
 
 			srv := &http.Server{

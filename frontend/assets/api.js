@@ -21,8 +21,13 @@
   } catch { db=structuredClone(seed); }
   const copy=x=>structuredClone(x);
   const persist=()=>{try{localStorage.setItem('classino.demo.v1',JSON.stringify({version:1,data:db}));}catch{throw new Error('ذخیره‌سازی مرورگر در دسترس نیست. تنظیمات مرورگر را بررسی کنید.');}};
+  const TOKEN_KEY='classino.accessToken';
+  const token=()=>{try{return sessionStorage.getItem(TOKEN_KEY)||'';}catch{return '';}};
+  const setToken=t=>{try{if(t)sessionStorage.setItem(TOKEN_KEY,t);else sessionStorage.removeItem(TOKEN_KEY);}catch{}};
   async function request(path,{method='GET',body}={}) {
     const headers={Accept:'application/json'};
+    const access=token();
+    if(access)headers.Authorization='Bearer '+access;
     if(body!==undefined)headers['Content-Type']='application/json';
     if(method!=='GET') {
       const item=document.cookie.split('; ').find(x=>x.startsWith(C.csrfCookie+'='));
@@ -54,8 +59,8 @@
     discipline:()=>choose(()=>copy(db.discipline),()=>request('/discipline')),
     addDiscipline:body=>choose(()=>{const item={...copy(body),id:crypto.randomUUID()};db.discipline.unshift(item);persist();return copy(item);},()=>request('/discipline',{method:'POST',body})),
     session:()=>choose(()=>({user:{id:'demo',name:'مدرس نمونه',role:'teacher'}}),()=>request('/auth/session')),
-    login:body=>request('/auth/login',{method:'POST',body}),
+    login:async body=>{const data=await request('/auth/login',{method:'POST',body});if(data?.token)setToken(data.token);return data;},
     register:body=>request('/auth/register',{method:'POST',body}),
-    logout:()=>request('/auth/logout',{method:'POST',body:{}})
+    logout:async()=>{try{await request('/auth/logout',{method:'POST',body:{}});}finally{setToken('');}}
   };
 })();

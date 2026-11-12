@@ -12,3 +12,7 @@ database:
 
 frontend:
   dir: frontend
+
+jwt:
+  access_ttl: 24h
+  cookie_name: access_token

@@ -38,24 +38,6 @@ func (u *UserUsecase) ReadByID(ctx context.Context, id types.ID) (entity.User, m
 	return user, message.UserRead
 }
 
-func (u *UserUsecase) Login(ctx context.Context, p params.LoginUserParams) (entity.User, messages.Message) {
-	if !validation.ValidEmail(p.Email) || !validation.ValidPassword(p.Password) {
-		return entity.User{}, message.UserInvalidPassword
-	}
-	user, err := u.users.ReadByEmail(ctx, strings.TrimSpace(p.Email))
-	if err != nil {
-		log.Printf("user login read: %v", err)
-		return entity.User{}, messages.SharedServerError()
-	}
-	if !user.ID.Valid() {
-		return entity.User{}, message.UserInvalidPassword
-	}
-	if err := u.hash.Compare(user.PasswordHash, p.Password); err != nil {
-		return entity.User{}, message.UserInvalidPassword
-	}
-	return user, message.LoginSuccess
-}
-
 func (u *UserUsecase) CreateByAdmin(ctx context.Context, p params.CreateUserUsecaseParams) (entity.User, messages.Message) {
 	if !p.ActorAdminID.Valid() {
 		return entity.User{}, message.AdminNotFound
