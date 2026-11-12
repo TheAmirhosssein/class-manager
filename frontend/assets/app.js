@@ -104,11 +104,44 @@
   const error = (e) => `<div class="error-message" role="alert">${esc(e.message || 'خطایی رخ داد.')}</div>`;
   const moduleSoon = () => `<p class="help">${MODULE_SOON}</p>`;
 
+  function hideModalAlert() {
+    const el = $('#modal-inline-alert', $('#modal-content'));
+    if (el) el.hidden = true;
+  }
+
   function toast(message) {
-    $('#toast').textContent = message;
-    $('#toast').hidden = false;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => ($('#toast').hidden = true), 4500);
+    const modal = $('#modal');
+    const pageToast = $('#toast');
+    if (modal?.open) {
+      if (pageToast) pageToast.hidden = true;
+      const content = $('#modal-content');
+      let alert = $('#modal-inline-alert', content);
+      if (!alert && content) {
+        alert = document.createElement('div');
+        alert.id = 'modal-inline-alert';
+        alert.className = 'error-message modal-inline-alert';
+        alert.setAttribute('role', 'alert');
+        const actions = content.querySelector('.quick-links');
+        if (actions) actions.before(alert);
+        else content.appendChild(alert);
+      }
+      if (alert) {
+        alert.textContent = message;
+        alert.hidden = false;
+        alert.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+      toastTimer = setTimeout(hideModalAlert, 4500);
+      return;
+    }
+    hideModalAlert();
+    if (pageToast) {
+      pageToast.textContent = message;
+      pageToast.hidden = false;
+      toastTimer = setTimeout(() => {
+        pageToast.hidden = true;
+      }, 4500);
+    }
   }
   function showModal(html) {
     currentModalOp++;
@@ -118,6 +151,7 @@
   }
   function closeModal() {
     currentModalOp++;
+    hideModalAlert();
     $('#modal').close();
   }
   $('.modal-close')?.addEventListener('click', closeModal);
