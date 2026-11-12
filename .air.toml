@@ -1,0 +1,13 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/classino ./cmd"
+  bin = "./tmp/classino"
+  full_bin = "./tmp/classino serve"
+  include_ext = ["go", "html", "yaml", "js", "css"]
+  exclude_dir = ["tmp", "data", "bin", "frontend/docs", "frontend/assets/fonts", "vendor"]
+  delay = 300
+
+[log]
+  time = true

@@ -1,0 +1,14 @@
+app:
+  name: classino
+  version: "0.1.0"
+
+http:
+  host: 127.0.0.1
+  port: 8080
+
+database:
+  driver: sqlite
+  path: data/classino.db
+
+frontend:
+  dir: frontend
