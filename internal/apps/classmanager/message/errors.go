@@ -20,4 +20,6 @@ var (
 	InvalidSessionInput  = messages.NewMessageByError(422_501, "اطلاعات جلسه نامعتبر است.")
 	SessionDayMismatch   = messages.NewMessageByError(422_502, "روز هفته با تاریخ جلسه (تهران) هم‌خوان نیست.")
 	SessionTimeOverlap   = messages.NewMessageByError(409_501, "این بازه با جلسهٔ دیگری در همان روز تداخل دارد.")
+
+	InvalidAttendanceInput = messages.NewMessageByError(422_601, "وضعیت حضور نامعتبر است.")
 )

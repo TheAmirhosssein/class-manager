@@ -82,6 +82,12 @@
     sessionsSearch = '',
     sessionsListPage = 1;
   const SESSIONS_PAGE_SIZE = 10;
+  const ATTENDANCE_STATUSES = [
+    ['present', 'حاضر'],
+    ['absent', 'غایب'],
+    ['late', 'تأخیر'],
+    ['excused', 'موجه'],
+  ];
   const faStudentCollator = new Intl.Collator('fa', { sensitivity: 'base', numeric: true });
   const studentsScopeSchoolId = () => API.activeSchool() || school?.id || schools[0]?.id || '';
   const sortStudentsPersian = (list) =>
@@ -478,7 +484,7 @@
       ? `<div class="table-wrap"><table class="classes-table sessions-table"><thead><tr><th>ردیف</th><th>کلاس</th><th>تاریخ</th><th>روز</th><th>ساعت</th><th>موضوع</th><th>عملیات</th></tr></thead><tbody>${pageRows
           .map((s, i) => {
             const subj = s.subject ? esc(s.subject) : '—';
-            return `<tr data-session-id="${esc(s.id)}"><td>${fa(start + i + 1)}</td><td>${esc(s.classTitle || '')}</td><td>${esc(prettyDate(s.sessionDate))}</td><td>${days[s.day] || '—'}</td><td><span title="Asia/Tehran">${prettyTime(s.startTime)} – ${prettyTime(s.endTime)}</span></td><td>${subj}</td><td><div class="table-actions"><button type="button" class="btn btn-outline btn-small" data-edit-session="${esc(s.id)}">ویرایش</button><button type="button" class="danger-link" data-delete-session="${esc(s.id)}">حذف</button></div></td></tr>`;
+            return `<tr data-session-id="${esc(s.id)}"><td>${fa(start + i + 1)}</td><td>${esc(s.classTitle || '')}</td><td>${esc(prettyDate(s.sessionDate))}</td><td>${days[s.day] || '—'}</td><td><span title="Asia/Tehran">${prettyTime(s.startTime)} – ${prettyTime(s.endTime)}</span></td><td>${subj}</td><td><div class="table-actions"><button type="button" class="btn btn-outline btn-small" data-attend-session="${esc(s.id)}">حضور و غیاب</button><button type="button" class="btn btn-outline btn-small" data-edit-session="${esc(s.id)}">ویرایش</button><button type="button" class="danger-link" data-delete-session="${esc(s.id)}">حذف</button></div></td></tr>`;
           })
           .join('')}</tbody></table></div>`
       : `<p class="empty">${total ? 'نتیجه‌ای برای فیلترها یافت نشد.' : 'جلسه‌ای ثبت نشده است.'}</p>`;
@@ -526,6 +532,12 @@
       $('#session-filter-class') && ($('#session-filter-class').innerHTML = sessionClassFilterOptions(sessionsPageClassId));
       paintSessionsTable();
     };
+    $$('[data-attend-session]').forEach((b) => {
+      b.onclick = () => {
+        sessionStorage.setItem('classino.attendanceSessionId', b.dataset.attendSession);
+        location.hash = 'panel/attendance';
+      };
+    });
     $$('[data-edit-session]').forEach((b) => {
       b.onclick = () => openSessionEditor(sessionsPageCache.find((x) => String(x.id) === b.dataset.editSession), reload);
     });
@@ -647,7 +659,7 @@
       ? `<div class="table-wrap"><table class="classes-table"><thead><tr><th>ردیف</th>${showSchool ? '<th>مدرسه</th>' : ''}<th>عنوان</th><th>پایه</th><th>اتاق</th><th>دانش‌آموز</th><th>عملیات</th></tr></thead><tbody>${pageRows
         .map((c, i) => {
           const room = c.room ? esc(c.room) : '—';
-          return `<tr data-class-id="${esc(c.id)}"><td>${fa(start + i + 1)}</td>${showSchool ? `<td>${esc(c.schoolName || '')}</td>` : ''}<td>${esc(c.title)}</td><td>${fa(c.grade)}</td><td>${room}</td><td>${fa(c.studentCount ?? 0)}</td><td><div class="table-actions"><button type="button" class="btn btn-outline btn-small" data-manage-students="${esc(c.id)}">دانش‌آموزان</button><button type="button" class="btn btn-outline btn-small" data-attend-class="${esc(c.id)}">حضور</button><button type="button" class="btn btn-outline btn-small" data-edit-class="${esc(c.id)}">ویرایش</button><button type="button" class="danger-link" data-delete-class="${esc(c.id)}">حذف</button></div></td></tr>`;
+          return `<tr data-class-id="${esc(c.id)}"><td>${fa(start + i + 1)}</td>${showSchool ? `<td>${esc(c.schoolName || '')}</td>` : ''}<td>${esc(c.title)}</td><td>${fa(c.grade)}</td><td>${room}</td><td>${fa(c.studentCount ?? 0)}</td><td><div class="table-actions"><button type="button" class="btn btn-outline btn-small" data-manage-students="${esc(c.id)}">دانش‌آموزان</button><button type="button" class="btn btn-outline btn-small" data-edit-class="${esc(c.id)}">ویرایش</button><button type="button" class="danger-link" data-delete-class="${esc(c.id)}">حذف</button></div></td></tr>`;
         })
         .join('')}</tbody></table></div>`
       : `<p class="empty">${total ? 'نتیجه‌ای برای جستجو یافت نشد.' : 'کلاسی ثبت نشده است.'}</p>`;
@@ -703,13 +715,6 @@
           }
           location.hash = 'panel/students';
         })
-    );
-    $$('[data-attend-class]').forEach(
-      (b) =>
-      (b.onclick = () => {
-        sessionStorage.setItem('classino.selectedClass', b.dataset.attendClass);
-        location.hash = 'panel/attendance';
-      })
     );
     $$('[data-edit-class]').forEach((b) => (b.onclick = () => openClassEditor(classBy(b.dataset.editClass))));
     $$('[data-delete-class]').forEach(
@@ -1182,121 +1187,85 @@
     paintStudentsTable();
   }
 
+  function attendanceStatusButtons(studentId, active) {
+    return `<div class="attendance-picks" data-student-id="${esc(studentId)}">${ATTENDANCE_STATUSES.map(
+      ([v, l]) =>
+        `<button type="button" class="btn btn-outline btn-small attendance-pick ${v === active ? 'active' : ''}" data-status="${v}">${l}</button>`
+    ).join('')}</div>`;
+  }
+
   async function renderAttendance(version) {
+    const body = $('#panel-body');
+    const sessionId = sessionStorage.getItem('classino.attendanceSessionId') || '';
     if (!school.id) {
-      $('#panel-body').innerHTML =
+      body.innerHTML =
         '<div class="notice">برای حضور و غیاب ابتدا مدرسه را تنظیم کنید.</div><a href="#panel/settings" class="btn btn-green">تنظیمات مدرسه ←</a>';
       return;
     }
-    if (!classes.length) {
-      $('#panel-body').innerHTML = noClassesNotice();
+    if (!sessionId) {
+      body.innerHTML = `<div class="notice">حضور و غیاب به جلسهٔ برنامه وصل است.</div><p class="help">از جدول «برنامه هفتگی» روی «حضور و غیاب» همان جلسه بزنید.</p><a href="#panel/schedule" class="btn btn-green">برنامه هفتگی ←</a>`;
       return;
     }
-    $('#panel-body').innerHTML = `<div class="form-row"><label>انتخاب کلاس<select id="attendance-class">${classOptions()}</select></label><label>تاریخ جلسه<span id="attendance-date" data-jalali-date="sessionDate" data-value="${today()}" data-required></span></label><button class="btn btn-outline" id="all-present">همه حاضر</button></div><div id="attendance-caption" class="help"></div><div id="attendance-table"></div><div class="save-bar"><button class="btn btn-green" id="attendance-save" disabled>ذخیره حضور و غیاب</button><span id="attendance-status" role="status">وضعیت را برای همه دانش‌آموزان مشخص کنید.</span></div>`;
-    upgradeJalaliFields($('#panel-body'));
-    const attendanceDateIso = () => JalaliPicker.getIso($('#attendance-date'));
-    $('#attendance-class').value = selectedClass();
-    let loadId = 0,
-      roster = [],
-      savedClass = '',
-      savedDate = '',
-      dirty = false;
-    async function load() {
-      const op = ++loadId,
-        id = $('#attendance-class').value,
-        date = attendanceDateIso();
-      $('#attendance-save').disabled = true;
-      $('#attendance-table').innerHTML = '<p class="help">در حال دریافت فهرست…</p>';
-      $('#attendance-status').textContent = '';
-      if (!id || !date) {
-        $('#attendance-table').innerHTML = '<p class="empty">کلاس و تاریخ معتبر انتخاب کنید.</p>';
-        return;
-      }
+    body.innerHTML = `<div class="surface attendance-page"><div id="attendance-header" class="help">در حال بارگذاری جلسه…</div><p class="help">با انتخاب هر وضعیت، بلافاصله ذخیره می‌شود.</p><div id="attendance-table-host"></div><div class="quick-links"><a href="#panel/schedule" class="btn btn-outline">بازگشت به برنامه</a></div></div>`;
+    let weeklySession = sessionsPageCache.find((s) => String(s.id) === String(sessionId));
+    if (!weeklySession) {
       try {
-        const [students, existing] = await Promise.all([API.students(id), API.attendance(id, date)]);
-        if (version !== routeVersion || op !== loadId) return;
-        roster = students;
-        savedClass = id;
-        savedDate = date;
-        dirty = false;
-        $('#attendance-caption').textContent = 'تاریخ جلسه: ' + prettyDate(date);
-        $('#attendance-table').innerHTML = students.length
-          ? `<div class="table-wrap"><table><thead><tr><th>ردیف</th><th>نام دانش‌آموز</th><th>وضعیت حضور</th></tr></thead><tbody>${students
-            .map((s, i) => {
-              const status = existing.records.find((x) => x.studentId === s.id)?.status || '';
-              const nm = studentDisplayName(s);
-              return `<tr><td>${fa(i + 1)}</td><td>${esc(nm)}</td><td><select data-student="${esc(s.id)}" aria-label="وضعیت ${esc(nm)}"><option value="">انتخاب وضعیت</option>${[
-                ['present', 'حاضر'],
-                ['absent', 'غایب'],
-                ['late', 'تأخیر'],
-                ['excused', 'غیبت موجه'],
-              ]
-                .map(([v, l]) => `<option value="${v}" ${v === status ? 'selected' : ''}>${l}</option>`)
-                .join('')}</select></td></tr>`;
-            })
-            .join('')}</tbody></table></div>`
-          : '<p class="empty">دانش‌آموزی در این کلاس ثبت نشده است.</p>';
-        $('#attendance-save').disabled = !students.length;
-        $('#attendance-status').textContent = existing.records.length
-          ? 'اطلاعات ثبت‌شده بارگذاری شد.'
-          : 'هنوز برای این جلسه حضوری ثبت نشده است.';
+        weeklySession = await API.weeklySession(sessionId);
       } catch (e) {
-        if (version === routeVersion && op === loadId) $('#attendance-table').innerHTML = error(e);
+        body.innerHTML = error(e) + '<a href="#panel/schedule" class="btn btn-green">برنامه هفتگی</a>';
+        return;
       }
     }
-    $('#attendance-table').onchange = () => {
-      dirty = true;
-      $('#attendance-status').textContent = 'تغییرات هنوز ذخیره نشده‌اند.';
+    if (version !== routeVersion) return;
+    const classTitle =
+      weeklySession.classTitle || classBy(weeklySession.classId)?.title || classes.find((c) => String(c.id) === String(weeklySession.classId))?.title || '';
+    $('#attendance-header').innerHTML = `<strong>${esc(classTitle)}</strong> · ${esc(prettyDate(weeklySession.sessionDate))} · ${prettyTime(weeklySession.startTime)}–${prettyTime(weeklySession.endTime)}${weeklySession.subject ? ` · ${esc(weeklySession.subject)}` : ''}`;
+    const statusMap = {};
+    const markRow = (studentId, status) => {
+      const row = $(`[data-attendance-row="${studentId}"]`);
+      if (!row) return;
+      $$('.attendance-pick', row).forEach((b) => b.classList.toggle('active', b.dataset.status === status));
     };
-    let previousClass = $('#attendance-class').value,
-      previousDate = attendanceDateIso();
-    const change = () => {
-      if (dirty && !confirm('تغییرات ذخیره نشده‌اند. از تغییر کلاس یا تاریخ مطمئن هستید؟')) {
-        $('#attendance-class').value = previousClass;
-        JalaliPicker.setIso($('#attendance-date'), previousDate);
-        return;
-      }
-      previousClass = $('#attendance-class').value;
-      previousDate = attendanceDateIso();
-      load();
-    };
-    $('#attendance-class').onchange = change;
-    $('#attendance-date').addEventListener('jalali-change', change);
-    $('#all-present').onclick = () => {
-      $$('[data-student]').forEach((x) => (x.value = 'present'));
-      dirty = true;
-      $('#attendance-status').textContent = 'همه حاضر انتخاب شدند؛ برای ثبت، ذخیره را بزنید.';
-    };
-    $('#attendance-save').onclick = async () => {
-      const records = $$('[data-student]').map((x) => ({ studentId: x.dataset.student, status: x.value }));
-      if (records.length !== roster.length || records.some((x) => !x.status)) {
-        toast('وضعیت همه دانش‌آموزان را مشخص کنید.');
-        return;
-      }
-      const btn = $('#attendance-save');
-      btn.disabled = true;
-      $('#attendance-class').disabled = true;
-      JalaliPicker.setDisabled($('#attendance-date'), true);
-      $('#all-present').disabled = true;
+    const host = $('#attendance-table-host');
+    host.innerHTML = '<p class="help">در حال دریافت فهرست…</p>';
+    try {
+      const [students, roll] = await Promise.all([API.students(weeklySession.classId), API.attendance(sessionId)]);
+      if (version !== routeVersion) return;
+      (roll.records || []).forEach((r) => {
+        statusMap[r.studentId] = r.status;
+      });
+      host.innerHTML = students.length
+        ? `<div class="table-wrap"><table class="classes-table attendance-table"><thead><tr><th>ردیف</th><th>نام</th><th>نام خانوادگی</th><th>وضعیت</th></tr></thead><tbody>${students
+            .map((s, i) => {
+              const st = statusMap[s.id] || '';
+              return `<tr data-attendance-row="${esc(s.id)}"><td>${fa(i + 1)}</td><td>${esc(s.firstName || '')}</td><td>${esc(s.lastName || '')}</td><td>${attendanceStatusButtons(s.id, st)}</td></tr>`;
+            })
+            .join('')}</tbody></table></div>`
+        : '<p class="empty">دانش‌آموزی در این کلاس ثبت نشده است.</p>';
+    } catch (e) {
+      if (version === routeVersion) host.innerHTML = error(e);
+      return;
+    }
+    host.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.attendance-pick');
+      if (!btn || btn.disabled) return;
+      const row = btn.closest('[data-attendance-row]');
+      const studentId = row?.dataset?.attendanceRow;
+      const status = btn.dataset.status;
+      if (!studentId || !status) return;
+      const picks = $$('.attendance-pick', row);
+      picks.forEach((b) => (b.disabled = true));
       try {
-        await API.saveAttendance({ classId: savedClass, date: savedDate, records });
-        if (version === routeVersion) {
-          dirty = false;
-          $('#attendance-status').textContent = 'ذخیره شد.';
-          toast('حضور و غیاب ذخیره شد.');
-        }
-      } catch (e) {
-        toast(e.message);
+        await API.setAttendance(sessionId, studentId, status);
+        if (version !== routeVersion) return;
+        statusMap[studentId] = status;
+        markRow(studentId, status);
+      } catch (err) {
+        toast(err.message);
       } finally {
-        if (version === routeVersion) {
-          btn.disabled = false;
-          $('#attendance-class').disabled = false;
-          JalaliPicker.setDisabled($('#attendance-date'), false);
-          $('#all-present').disabled = false;
-        }
+        if (version === routeVersion) picks.forEach((b) => (b.disabled = false));
       }
-    };
-    await load();
+    });
   }
 
   async function renderDiscipline(version) {

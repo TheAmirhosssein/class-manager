@@ -21,4 +21,7 @@ var (
 	SessionCreated = messages.NewMessage(201_501, "جلسه به برنامه اضافه شد")
 	SessionUpdated = messages.NewMessage(200_502, "جلسه به‌روز شد")
 	SessionDeleted = messages.NewMessage(200_503, "جلسه حذف شد")
+
+	AttendanceRead  = messages.NewMessage(200_601, "")
+	AttendanceSaved = messages.NewMessage(200_602, "")
 )

@@ -17,14 +17,17 @@ func Register(engine *gin.Engine, cfg *config.Config, db *sql.DB, tokens *jwt.Se
 	classRepo := repository.NewClassRepository(db)
 	studentRepo := repository.NewStudentRepository(db)
 	sessionRepo := repository.NewSessionRepository(db)
+	attendanceRepo := repository.NewAttendanceRepository(db)
 	schoolUC := usecase.NewSchoolUsecase(schoolRepo)
 	classUC := usecase.NewClassUsecase(classRepo, schoolRepo)
 	studentUC := usecase.NewStudentUsecase(studentRepo, classRepo, schoolRepo)
 	sessionUC := usecase.NewSessionUsecase(sessionRepo, classRepo, schoolRepo)
+	attendanceUC := usecase.NewAttendanceUsecase(attendanceRepo, sessionRepo, studentRepo, classRepo, schoolRepo)
 	schoolH := handler.NewSchoolHandler(schoolUC)
 	classH := handler.NewClassHandler(classUC)
 	studentH := handler.NewStudentHandler(studentUC)
 	sessionH := handler.NewSessionHandler(sessionUC)
+	attendanceH := handler.NewAttendanceHandler(attendanceUC)
 
 	cookieName := cfg.JWT.CookieName
 	api := engine.Group("/api/v1")
@@ -41,6 +44,7 @@ func Register(engine *gin.Engine, cfg *config.Config, db *sql.DB, tokens *jwt.Se
 	secured.GET("/student", studentH.Get)
 	secured.GET("/sessions", sessionH.List)
 	secured.GET("/session", sessionH.Get)
+	secured.GET("/attendance", attendanceH.Get)
 
 	writes := secured.Group("")
 	writes.Use(middleware.CSRFRequired())
@@ -55,4 +59,5 @@ func Register(engine *gin.Engine, cfg *config.Config, db *sql.DB, tokens *jwt.Se
 	writes.POST("/session", sessionH.Create)
 	writes.PATCH("/session", sessionH.Patch)
 	writes.DELETE("/session", sessionH.Delete)
+	writes.PATCH("/attendance", attendanceH.Patch)
 }

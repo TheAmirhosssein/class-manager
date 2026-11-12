@@ -135,3 +135,15 @@ type DeleteSessionParams struct {
 	Actor     OwnerActor
 	SessionID types.ID
 }
+
+type ReadAttendanceParams struct {
+	Actor           OwnerActor
+	WeeklySessionID types.ID
+}
+
+type SetAttendanceRecordParams struct {
+	Actor           OwnerActor
+	WeeklySessionID types.ID
+	StudentID       types.ID
+	Status          string
+}

@@ -138,8 +138,12 @@
         },
       }),
     deleteStudent: (studentId) => request('/student?studentId=' + enc(studentId), { method: 'DELETE', body: {} }),
-    attendance: notImplemented('حضور و غیاب'),
-    saveAttendance: notImplemented('حضور و غیاب'),
+    attendance: (sessionId) => request('/attendance?sessionId=' + enc(String(sessionId))),
+    setAttendance: (sessionId, studentId, status) =>
+      request('/attendance?sessionId=' + enc(String(sessionId)) + '&studentId=' + enc(String(studentId)), {
+        method: 'PATCH',
+        body: { status },
+      }),
     discipline: () => Promise.resolve([]),
     addDiscipline: notImplemented('انضباط'),
     session: () => request('/auth/session'),
