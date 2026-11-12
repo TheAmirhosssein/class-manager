@@ -8,7 +8,7 @@
   const prettyDate=v=>{try{return new Intl.DateTimeFormat('fa-IR',{dateStyle:'medium'}).format(new Date(v+'T12:00:00'));}catch{return v;}};
   const BRAND='کلاسینو';
   const DEMO_AUTH_KEY='classino.demoAuth';
-  let classes=[],schedule=[],school={name:'مدرسه نمونه'},routeVersion=0,currentModalOp=0,toastTimer,user=null;
+  let classes=[],schedule=[],school={id:'',name:'مدرسه نمونه'},routeVersion=0,currentModalOp=0,toastTimer,user=null;
   const classBy=id=>classes.find(x=>x.id===id);
   const classOptions=()=>classes.map(x=>`<option value="${esc(x.id)}">${esc(x.title)}</option>`).join('');
   const dayOptions=()=>days.map((x,i)=>`<option value="${i}">${x}</option>`).join('');
@@ -19,7 +19,30 @@
   $('.modal-close')?.addEventListener('click',closeModal);
   $('#modal')?.addEventListener('click',e=>{if(e.target===$('#modal')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeModal();}});
   $('#modal')?.addEventListener('cancel',()=>currentModalOp++);
-  function setSchool(){ $('#school-label').textContent=school.name; }
+  function setSchool(){ $('#school-label').textContent=school.name||'مدرسه شما'; }
+  async function loadPanelData(){
+    if(APP_CONFIG.demo){
+      [classes,schedule,school]=await Promise.all([API.classes(),API.schedule(),API.school()]);
+      setSchool();
+      return !!school.name;
+    }
+    try{
+      school=await API.school();
+      if(school?.id)API.setActiveSchool(school.id);
+      classes=[];schedule=[];
+      setSchool();
+      return true;
+    }catch(e){
+      if(/مدرسه‌ای برای حساب|یافت نشد/i.test(e.message)){
+        school={id:'',name:''};
+        classes=[];schedule=[];
+        API.setActiveSchool('');
+        setSchool();
+        return false;
+      }
+      throw e;
+    }
+  }
   function isLoggedIn(){return !!user&&['teacher','admin'].includes(user.role);}
   function setView(mode){
     const panel=mode==='panel';
@@ -77,6 +100,8 @@
       if(!APP_CONFIG.demo)await API.logout();
     }catch(e){toast(e.message);return;}
     user=null;
+    API.setActiveSchool('');
+    school={id:'',name:''};classes=[];schedule=[];
     if(APP_CONFIG.demo)sessionStorage.removeItem(DEMO_AUTH_KEY);
     updateHeaderAuth();
     location.hash='login';
@@ -131,6 +156,7 @@
       await refreshSession();if(version!==routeVersion)return;
       if(!isLoggedIn()){sessionStorage.setItem('classino.afterLogin',hash);location.replace('#login');return;}
       updateHeaderAuth();
+      await loadPanelData();if(version!==routeVersion)return;
       if(tab==='overview')renderOverview();
       if(tab==='classes')renderClasses();
       if(tab==='attendance')await renderAttendance(version);
@@ -158,7 +184,7 @@
     }
     location.replace('#login');
   }
-  function renderOverview(){const total=classes.reduce((n,c)=>n+c.studentCount,0);$('#panel-body').innerHTML=`${APP_CONFIG.demo?'<div class="notice">این پنل با اطلاعات نمونه کار می‌کند. تغییرات فقط در همین مرورگر ذخیره می‌شوند.</div>':''}<div class="stats"><div class="stat"><b>${fa(classes.length)}</b><span>کلاس آموزشی</span></div><div class="stat"><b>${fa(total)}</b><span>عضویت در کلاس‌ها</span></div><div class="stat"><b>${fa(schedule.length)}</b><span>بازه در برنامه هفتگی</span></div></div><div class="surface"><div class="eyebrow">سلام، ${esc(user.name)}</div><h2>یک روز تازه، یک فرصت برای یادگیری</h2><p>از اینجا کلاس‌ها را مدیریت کنید، حضور و غیاب را ثبت کنید و برنامه هفته را منظم نگه دارید.</p><div class="quick-links"><a href="#panel/attendance" class="btn btn-green">ثبت حضور و غیاب ←</a><a href="#panel/schedule" class="btn btn-outline">برنامه هفتگی</a></div></div><div class="surface"><h2>مدرسه شما</h2><p>${esc(school.name)}</p><a class="text-link" href="#panel/settings">ویرایش نام مدرسه ←</a></div>`;}
+  function renderOverview(){if(!school.id&&!APP_CONFIG.demo){$('#panel-body').innerHTML='<div class="notice">هنوز مدرسه‌ای نساخته‌اید. از بخش «نام مدرسه» یک مدرسه بسازید.</div><a href="#panel/settings" class="btn btn-green">ساخت مدرسه ←</a>';return;}const total=classes.reduce((n,c)=>n+c.studentCount,0);$('#panel-body').innerHTML=`${APP_CONFIG.demo?'<div class="notice">این پنل با اطلاعات نمونه کار می‌کند. تغییرات فقط در همین مرورگر ذخیره می‌شوند.</div>':''}<div class="stats"><div class="stat"><b>${fa(classes.length)}</b><span>کلاس آموزشی</span></div><div class="stat"><b>${fa(total)}</b><span>عضویت در کلاس‌ها</span></div><div class="stat"><b>${fa(schedule.length)}</b><span>بازه در برنامه هفتگی</span></div></div><div class="surface"><div class="eyebrow">سلام، ${esc(user.name)}</div><h2>یک روز تازه، یک فرصت برای یادگیری</h2><p>از اینجا کلاس‌ها را مدیریت کنید، حضور و غیاب را ثبت کنید و برنامه هفته را منظم نگه دارید.</p><div class="quick-links"><a href="#panel/attendance" class="btn btn-green">ثبت حضور و غیاب ←</a><a href="#panel/schedule" class="btn btn-outline">برنامه هفتگی</a></div></div><div class="surface"><h2>مدرسه شما</h2><p>${esc(school.name)}</p><a class="text-link" href="#panel/settings">ویرایش نام مدرسه ←</a></div>`;}
   function renderClasses(){$('#panel-body').innerHTML=`<p class="help">برای ثبت وضعیت آموزشی، کلاس موردنظر را انتخاب کنید.</p><div class="panel-class-grid">${classes.map(c=>`<article class="surface"><span class="badge">پایه ${fa(c.grade)}</span><h3>${esc(c.title)}</h3><p>${esc(c.room)} • ${fa(c.studentCount)} دانش‌آموز</p><button class="btn btn-outline btn-small" data-attend-class="${esc(c.id)}">حضور و غیاب ←</button></article>`).join('')}</div>`;$$('[data-attend-class]').forEach(b=>b.onclick=()=>{sessionStorage.setItem('classino.selectedClass',b.dataset.attendClass);location.hash='panel/attendance';});}
   function selectedClass(){try{const id=sessionStorage.getItem('classino.selectedClass')||sessionStorage.getItem('riazino.selectedClass');return classBy(id)?id:classes[0]?.id||'';}catch{return classes[0]?.id||'';}}
   async function renderAttendance(version){
@@ -190,18 +216,17 @@
     $('#schedule-form').onsubmit=async e=>{e.preventDefault();const d=new FormData(e.target),body={classId:d.get('classId'),day:Number(d.get('day')),start:d.get('start'),end:d.get('end'),topic:d.get('topic').trim()};if(!body.topic){toast('موضوع جلسه را وارد کنید.');return;}if(body.start>=body.end){toast('ساعت پایان باید بعد از ساعت شروع باشد.');return;}if(schedule.some(s=>s.day===body.day&&s.start<body.end&&body.start<s.end)){toast('این بازه با یکی از کلاس‌های مدرس تداخل دارد.');return;}const btn=$('button[type="submit"]',e.target);btn.disabled=true;try{const item=await API.addSchedule(body);schedule.push(item);if(version===routeVersion){table();toast('جلسه به برنامه اضافه شد.');}}catch(e){toast(e.message);}finally{btn.disabled=false;}};
     $('#schedule-table').onclick=async e=>{const btn=e.target.closest('[data-remove]');if(!btn)return;if(!confirm('این جلسه از برنامه هفتگی حذف شود؟'))return;btn.disabled=true;try{await API.removeSchedule(btn.dataset.remove);schedule=schedule.filter(x=>x.id!==btn.dataset.remove);if(version===routeVersion){table();toast('جلسه حذف شد.');}}catch(e){toast(e.message);btn.disabled=false;}};
   }
-  function renderSettings(){$('#panel-body').innerHTML=`<div class="surface"><h2>نام مدرسه</h2><p>این نام در فضای آموزشی نمایش داده می‌شود.</p><form id="school-form" class="form-stack"><label>نام مدرسه<input name="name" value="${esc(school.name)}" minlength="2" maxlength="80" required></label><div><button class="btn btn-green" type="submit">ذخیره تغییرات</button></div></form></div>`;$('#school-form').onsubmit=async e=>{e.preventDefault();const name=new FormData(e.target).get('name').trim();if(name.length<2){toast('نام مدرسه باید حداقل ۲ حرف باشد.');return;}const btn=$('button',e.target);btn.disabled=true;try{school=await API.saveSchool({name});setSchool();toast('نام مدرسه ذخیره شد.');}catch(e){toast(e.message);}finally{btn.disabled=false;}};}
+  function renderSettings(){const creating=!school.id&&!APP_CONFIG.demo;$('#panel-body').innerHTML=`<div class="surface"><h2>${creating?'ساخت مدرسه':'نام مدرسه'}</h2><p>${creating?'هر حساب می‌تواند مدرسه‌های خود را بسازد و فقط به همان‌ها دسترسی دارد.':'این نام در فضای آموزشی نمایش داده می‌شود.'}</p><form id="school-form" class="form-stack"><label>نام مدرسه<input name="name" value="${esc(school.name||'')}" minlength="2" maxlength="80" required placeholder="مثلاً دبیرستان نمونه"></label><div><button class="btn btn-green" type="submit">${creating?'ساخت مدرسه':'ذخیره تغییرات'}</button></div></form></div>`;$('#school-form').onsubmit=async e=>{e.preventDefault();const name=new FormData(e.target).get('name').trim();if(name.length<2){toast('نام مدرسه باید حداقل ۲ حرف باشد.');return;}const btn=$('button',e.target);btn.disabled=true;try{if(creating){school=await API.createSchool({name});toast('مدرسه ساخته شد.');}else{school=await API.saveSchool({name,id:school.id});toast('نام مدرسه ذخیره شد.');}if(school?.id)API.setActiveSchool(school.id);setSchool();await loadPanelData();}catch(err){toast(err.message);}finally{btn.disabled=false;}};}
   $('#auth-form').addEventListener('submit',submitAuth);
   $('#demo-enter')?.addEventListener('click',()=>completeLogin({id:'demo',name:'مدرس نمونه',role:'teacher'}));
   $('#logout-button')?.addEventListener('click',logout);
   async function init(){
     if(!APP_CONFIG.demo){
       $('.subtle-tag').hidden=true;$('.demo-note').hidden=true;$('#mode-label').textContent='متصل به سامانه';
-      classes=[];schedule=[];school={name:'مدرسه نمونه'};setSchool();
-    }else{
-      try{[classes,schedule,school]=await Promise.all([API.classes(),API.schedule(),API.school()]);setSchool();}catch(e){$('#panel-body').innerHTML=error(e)+'<button class="btn btn-outline" id="reload-data">تلاش دوباره</button>';$('#reload-data').onclick=()=>location.reload();}
     }
     await refreshSession();
+    if(isLoggedIn()&&!APP_CONFIG.demo){try{await loadPanelData();}catch{}}
+    else if(APP_CONFIG.demo){try{await loadPanelData();}catch{}}
     updateHeaderAuth();
     if(!location.hash||location.hash==='#'||location.hash==='#home'){
       location.hash=isLoggedIn()?'panel':'login';

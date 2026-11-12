@@ -13,6 +13,7 @@ import (
 
 	"github.com/TheAmirhosssein/class-manager/config"
 	accountsrouter "github.com/TheAmirhosssein/class-manager/internal/apps/accounts/delivery/http/router"
+	schoolrouter "github.com/TheAmirhosssein/class-manager/internal/apps/school/delivery/http/router"
 	"github.com/TheAmirhosssein/class-manager/internal/infrastructure/database"
 	"github.com/TheAmirhosssein/class-manager/internal/infrastructure/jwt"
 	"github.com/TheAmirhosssein/class-manager/internal/infrastructure/server"
@@ -63,6 +64,7 @@ func serveCmd() *cobra.Command {
 			engine.Use(gin.Recovery())
 			server.RegisterHealth(engine, db)
 			accountsrouter.Register(engine, cfg, db, tokens)
+			schoolrouter.Register(engine, cfg, db, tokens)
 			server.RegisterFrontend(engine, cfg.Frontend.Dir)
 
 			srv := &http.Server{

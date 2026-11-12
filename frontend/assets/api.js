@@ -45,19 +45,24 @@
   }
   const choose=(demo,live)=>C.demo?Promise.resolve().then(demo):live();
   const enc=encodeURIComponent;
+  let activeSchoolId='';
+  const schoolQ=()=>activeSchoolId?'?schoolId='+enc(activeSchoolId):'';
   window.API={
-    courses:()=>choose(()=>copy(db.courses),()=>request('/courses')),
-    classes:()=>choose(()=>copy(db.classes),()=>request('/classes')),
-    school:()=>choose(()=>copy(db.school),()=>request('/school')),
-    saveSchool:body=>choose(()=>{db.school=copy(body);persist();return copy(body);},()=>request('/school',{method:'PATCH',body})),
-    schedule:()=>choose(()=>copy(db.schedule),()=>request('/schedule')),
-    addSchedule:body=>choose(()=>{const item={...copy(body),id:crypto.randomUUID()};db.schedule.push(item);persist();return copy(item);},()=>request('/schedule',{method:'POST',body})),
-    removeSchedule:id=>choose(()=>{db.schedule=db.schedule.filter(x=>x.id!==id);persist();},()=>request('/schedule/'+enc(id),{method:'DELETE'})),
-    students:id=>choose(()=>copy(db.students[id]||[]),()=>request('/classes/'+enc(id)+'/students')),
-    attendance:(classId,date)=>choose(()=>copy(db.attendance[classId+':'+date]||{classId,date,records:[]}),()=>request('/attendance?classId='+enc(classId)+'&date='+enc(date))),
-    saveAttendance:body=>choose(()=>{db.attendance[body.classId+':'+body.date]=copy(body);persist();return copy(body);},()=>request('/attendance',{method:'PUT',body})),
-    discipline:()=>choose(()=>copy(db.discipline),()=>request('/discipline')),
-    addDiscipline:body=>choose(()=>{const item={...copy(body),id:crypto.randomUUID()};db.discipline.unshift(item);persist();return copy(item);},()=>request('/discipline',{method:'POST',body})),
+    setActiveSchool(id){activeSchoolId=id?String(id):'';},
+    activeSchool(){return activeSchoolId;},
+    courses:()=>choose(()=>copy(db.courses),()=>Promise.resolve([])),
+    classes:()=>choose(()=>copy(db.classes),()=>Promise.resolve([])),
+    school:()=>choose(()=>copy(db.school),async()=>{const data=await request('/school'+schoolQ());if(data?.id)activeSchoolId=String(data.id);return data;}),
+    createSchool:body=>choose(()=>{const item={...copy(body),id:'demo-school'};db.school=item;persist();activeSchoolId=item.id;return copy(item);},async()=>{const data=await request('/school',{method:'POST',body});if(data?.id)activeSchoolId=String(data.id);return data;}),
+    saveSchool:body=>choose(()=>{db.school={...copy(db.school),...copy(body)};persist();return copy(db.school);},()=>request('/school'+schoolQ(),{method:'PATCH',body:{...body,id:activeSchoolId||body.id}})),
+    schedule:()=>choose(()=>copy(db.schedule),()=>Promise.resolve([])),
+    addSchedule:body=>choose(()=>{const item={...copy(body),id:crypto.randomUUID()};db.schedule.push(item);persist();return copy(item);},()=>Promise.reject(new Error('ماژول برنامه کلاسی هنوز روی سرور فعال نیست.'))),
+    removeSchedule:id=>choose(()=>{db.schedule=db.schedule.filter(x=>x.id!==id);persist();},()=>Promise.reject(new Error('ماژول برنامه کلاسی هنوز روی سرور فعال نیست.'))),
+    students:id=>choose(()=>copy(db.students[id]||[]),()=>Promise.resolve([])),
+    attendance:(classId,date)=>choose(()=>copy(db.attendance[classId+':'+date]||{classId,date,records:[]}),()=>Promise.reject(new Error('ماژول حضور و غیاب هنوز روی سرور فعال نیست.'))),
+    saveAttendance:body=>choose(()=>{db.attendance[body.classId+':'+body.date]=copy(body);persist();return copy(body);},()=>Promise.reject(new Error('ماژول حضور و غیاب هنوز روی سرور فعال نیست.'))),
+    discipline:()=>choose(()=>copy(db.discipline),()=>Promise.resolve([])),
+    addDiscipline:body=>choose(()=>{const item={...copy(body),id:crypto.randomUUID()};db.discipline.unshift(item);persist();return copy(item);},()=>Promise.reject(new Error('ماژول انضباط هنوز روی سرور فعال نیست.'))),
     session:()=>choose(()=>({user:{id:'demo',name:'مدرس نمونه',role:'teacher'}}),()=>request('/auth/session')),
     login:async body=>{const data=await request('/auth/login',{method:'POST',body});if(data?.token)setToken(data.token);return data;},
     register:body=>request('/auth/register',{method:'POST',body}),

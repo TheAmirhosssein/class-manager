@@ -7,6 +7,7 @@ import (
 	"github.com/TheAmirhosssein/class-manager/internal/apps/accounts/delivery/http/handler"
 	"github.com/TheAmirhosssein/class-manager/internal/apps/accounts/repository"
 	"github.com/TheAmirhosssein/class-manager/internal/apps/accounts/usecase"
+	"github.com/TheAmirhosssein/class-manager/internal/httpconfig/middleware"
 	"github.com/TheAmirhosssein/class-manager/internal/infrastructure/hash"
 	"github.com/TheAmirhosssein/class-manager/internal/infrastructure/jwt"
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,7 @@ func Register(engine *gin.Engine, cfg *config.Config, db *sql.DB, tokens *jwt.Se
 	authH := handler.NewAuthHandler(authUC, cfg.JWT.CookieName, cfg.JWT.AccessTTL)
 
 	api := engine.Group("/api/v1")
+	api.Use(middleware.EnsureCSRF())
 	auth := api.Group("/auth")
 	auth.POST("/login", authH.Login)
 	auth.GET("/session", authH.Session)

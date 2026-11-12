@@ -8,6 +8,7 @@ import (
 	"github.com/TheAmirhosssein/class-manager/internal/apps/accounts/entity"
 	"github.com/TheAmirhosssein/class-manager/internal/apps/accounts/enum"
 	"github.com/TheAmirhosssein/class-manager/internal/apps/accounts/repository"
+	"github.com/TheAmirhosssein/class-manager/internal/infrastructure/database"
 	"github.com/TheAmirhosssein/class-manager/internal/infrastructure/hash"
 )
 
@@ -33,10 +34,25 @@ func Create(ctx context.Context, db *sql.DB) error {
 	if err := ensureAdmin(ctx, adminRepo, h); err != nil {
 		return err
 	}
-	if err := ensureSampleSchool(ctx, db); err != nil {
+	teacherID, err := teacherUserID(ctx, userRepo)
+	if err != nil {
+		return err
+	}
+	if err := ensureSampleSchool(ctx, db, teacherID); err != nil {
 		return err
 	}
 	return nil
+}
+
+func teacherUserID(ctx context.Context, users repository.UserRepository) (int64, error) {
+	u, err := users.ReadByMobile(ctx, TeacherMobile)
+	if err != nil {
+		return 0, err
+	}
+	if !u.ID.Valid() {
+		return 0, fmt.Errorf("seed teacher missing")
+	}
+	return int64(u.ID), nil
 }
 
 func ensureTeacher(ctx context.Context, users repository.UserRepository, h hash.Hash) error {
@@ -80,15 +96,24 @@ func ensureAdmin(ctx context.Context, admins repository.AdminRepository, h hash.
 	return err
 }
 
-func ensureSampleSchool(ctx context.Context, db *sql.DB) error {
-	var n int
-	err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM schools`).Scan(&n)
-	if err != nil {
+func ensureSampleSchool(ctx context.Context, db *sql.DB, ownerUserID int64) error {
+	var schoolID int64
+	err := db.QueryRowContext(ctx, `
+		SELECT id FROM schools WHERE owner_user_id = ? ORDER BY id LIMIT 1`, ownerUserID).Scan(&schoolID)
+	if database.IsNoRows(err) {
+		res, insErr := db.ExecContext(ctx, `
+			INSERT INTO schools (name, owner_user_id) VALUES (?, ?)`, "مدرسه نمونه", ownerUserID)
+		if insErr != nil {
+			return insErr
+		}
+		schoolID, err = res.LastInsertId()
+		if err != nil {
+			return err
+		}
+	} else if err != nil {
 		return err
 	}
-	if n > 0 {
-		return nil
-	}
-	_, err = db.ExecContext(ctx, `INSERT INTO schools (name) VALUES (?)`, "مدرسه نمونه")
-	return err
+	_, _ = db.ExecContext(ctx, `
+		UPDATE schools SET owner_user_id = ? WHERE id = ? AND owner_user_id IS NULL`, ownerUserID, schoolID)
+	return nil
 }
