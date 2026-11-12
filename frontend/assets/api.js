@@ -144,8 +144,38 @@
         method: 'PATCH',
         body: { status },
       }),
-    discipline: () => Promise.resolve([]),
-    addDiscipline: notImplemented('انضباط'),
+    discipline: (schoolId, classId, studentId) => {
+      const q = [];
+      if (schoolId) q.push('schoolId=' + enc(String(schoolId)));
+      if (classId) q.push('classId=' + enc(String(classId)));
+      if (studentId) q.push('studentId=' + enc(String(studentId)));
+      if (!q.length) return request('/discipline' + schoolQ());
+      return request('/discipline?' + q.join('&'));
+    },
+    createDiscipline: (body, classId) =>
+      request('/discipline?classId=' + enc(String(classId)), {
+        method: 'POST',
+        body: {
+          studentId: body.studentId,
+          type: body.type,
+          recordDate: body.recordDate,
+          note: body.note,
+        },
+      }),
+    saveDiscipline: (body) =>
+      request('/discipline?disciplineId=' + enc(body.id || ''), {
+        method: 'PATCH',
+        body: {
+          id: body.id,
+          classId: body.classId,
+          studentId: body.studentId,
+          type: body.type,
+          recordDate: body.recordDate,
+          note: body.note,
+        },
+      }),
+    deleteDiscipline: (disciplineId) =>
+      request('/discipline?disciplineId=' + enc(String(disciplineId)), { method: 'DELETE', body: {} }),
     session: () => request('/auth/session'),
     login: async (body) => {
       const data = await request('/auth/login', { method: 'POST', body });

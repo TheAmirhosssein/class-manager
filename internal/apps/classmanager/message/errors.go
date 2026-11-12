@@ -22,4 +22,7 @@ var (
 	SessionTimeOverlap   = messages.NewMessageByError(409_501, "این بازه با جلسهٔ دیگری در همان روز تداخل دارد.")
 
 	InvalidAttendanceInput = messages.NewMessageByError(422_601, "وضعیت حضور نامعتبر است.")
+
+	DisciplineNotFound      = messages.NewMessageByError(404_701, "یادداشت انضباطی یافت نشد.")
+	InvalidDisciplineInput  = messages.NewMessageByError(422_701, "اطلاعات یادداشت انضباطی نامعتبر است.")
 )

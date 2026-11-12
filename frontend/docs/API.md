@@ -163,4 +163,25 @@ POST بدنه:
 
 `sessionId` همان شناسهٔ جلسه در جدول `sessions` (برنامه هفتگی) است.
 
-سایر ماژول‌ها (انضباط، …) هنوز روی این سرور ثبت نشده‌اند.
+### یادداشت انضباطی
+
+| متد | مسیر | توضیح |
+| --- | --- | --- |
+| GET | `/discipline?schoolId=&classId=&studentId=` | فهرست یادداشت‌ها (فیلترها اختیاری) |
+| POST | `/discipline?classId=` | ایجاد یادداشت |
+| PATCH | `/discipline?disciplineId=` | ویرایش |
+| DELETE | `/discipline?disciplineId=` | حذف |
+
+```json
+{
+  "id": "1",
+  "classId": "2",
+  "studentId": "5",
+  "studentName": "علی رضایی",
+  "type": "positive",
+  "recordDate": "2025-11-12",
+  "note": "مشارکت خوب در کلاس"
+}
+```
+
+`type`: `positive` (تشویق) یا `attention` (نیاز به پیگیری). `note` بین ۳ تا ۱۰۰۰ کاراکتر.

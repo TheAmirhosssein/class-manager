@@ -90,6 +90,18 @@
     sessionsSearch = '',
     sessionsListPage = 1;
   const SESSIONS_PAGE_SIZE = 10;
+  let disciplinePageClassId = '',
+    disciplinePageStudentId = '',
+    disciplinePageCache = [],
+    disciplineClassesCache = [],
+    disciplineStudentsCache = [],
+    disciplineSearch = '',
+    disciplineListPage = 1;
+  const DISCIPLINE_PAGE_SIZE = 10;
+  const DISCIPLINE_TYPES = [
+    ['positive', 'تشویق'],
+    ['attention', 'نیاز به پیگیری'],
+  ];
   const ATTENDANCE_STATUSES = [
     ['present', 'حاضر'],
     ['absent', 'غایب'],
@@ -394,6 +406,337 @@
   }
 
   const sessionsScopeSchoolId = () => API.activeSchool() || school?.id || schools[0]?.id || '';
+  const disciplineScopeSchoolId = () => API.activeSchool() || school?.id || schools[0]?.id || '';
+  const disciplineTypeLabel = (t) => DISCIPLINE_TYPES.find((x) => x[0] === t)?.[1] || t;
+  const disciplineClassFilterOptions = (selectedClassId) =>
+    `<option value="" ${selectedClassId === '' || selectedClassId === undefined ? 'selected' : ''}>همه کلاس‌ها</option>${disciplineClassesCache
+      .map(
+        (c) =>
+          `<option value="${esc(c.id)}" ${String(c.id) === String(selectedClassId) ? 'selected' : ''}>${esc(c.title)}</option>`
+      )
+      .join('')}`;
+
+  function studentComboboxHtml(hiddenValue, placeholder, hiddenName = 'studentId') {
+    return `<div class="student-combobox" data-student-combobox><input type="search" class="student-combobox-input" autocomplete="off" placeholder="${esc(placeholder)}" aria-autocomplete="list"><input type="hidden" name="${hiddenName}" value="${esc(hiddenValue || '')}"><ul class="student-combobox-list" role="listbox" hidden></ul></div>`;
+  }
+
+  function wireStudentCombobox(wrap, { students, allowEmpty, emptyLabel, onChange }) {
+    if (!wrap) return null;
+    const input = $('.student-combobox-input', wrap);
+    const hidden = $('input[type="hidden"]', wrap);
+    const list = $('.student-combobox-list', wrap);
+    const labels = () =>
+      students.map((s) => ({ id: String(s.id), label: studentDisplayName(s), raw: s }));
+    const filter = (q) => {
+      const qq = q.trim();
+      const base = labels();
+      if (!qq) return base;
+      return base.filter((s) => s.label.includes(qq));
+    };
+    const paint = (items) => {
+      const rows = allowEmpty ? [{ id: '', label: emptyLabel || 'همه دانش‌آموزان' }, ...items] : items;
+      list.innerHTML = rows
+        .map((s) => `<li role="option" data-id="${esc(s.id)}" tabindex="-1">${esc(s.label)}</li>`)
+        .join('');
+      list.hidden = !rows.length;
+    };
+    const select = (id, label) => {
+      hidden.value = id;
+      input.value = id ? label : allowEmpty ? emptyLabel || '' : '';
+      list.hidden = true;
+      onChange?.(id);
+    };
+    const syncInputFromHidden = () => {
+      const hit = labels().find((s) => s.id === String(hidden.value));
+      input.value = hit ? hit.label : allowEmpty && !hidden.value ? '' : input.value;
+    };
+    syncInputFromHidden();
+    input.addEventListener('focus', () => paint(filter(input.value)));
+    input.addEventListener('input', () => {
+      if (!allowEmpty) hidden.value = '';
+      paint(filter(input.value));
+    });
+    list.addEventListener('mousedown', (e) => {
+      const li = e.target.closest('[data-id]');
+      if (!li) return;
+      e.preventDefault();
+      select(li.dataset.id, li.textContent.trim());
+    });
+    const onDoc = (e) => {
+      if (!wrap.contains(e.target)) list.hidden = true;
+    };
+    document.addEventListener('click', onDoc);
+    return {
+      setStudents(next) {
+        students = next || [];
+        syncInputFromHidden();
+      },
+      setValue(id) {
+        hidden.value = id || '';
+        syncInputFromHidden();
+      },
+      getValue: () => hidden.value,
+      destroy: () => document.removeEventListener('click', onDoc),
+    };
+  }
+
+  async function fetchDisciplineForFilter(schoolId, classId, studentId) {
+    const sid = schoolId || disciplineScopeSchoolId();
+    disciplineClassesCache = await fetchClassesForFilter(sid);
+    const byClass = Object.fromEntries(disciplineClassesCache.map((c) => [String(c.id), c]));
+    const classQ = classId || '';
+    const studentQ = studentId || '';
+    const list = await API.discipline(sid, classQ, studentQ);
+    return list
+      .map((r) => ({
+        ...r,
+        recordDate: r.recordDate || r.date || '',
+        classTitle: byClass[String(r.classId)]?.title || '',
+      }))
+      .sort((a, b) => String(b.recordDate).localeCompare(String(a.recordDate)));
+  }
+
+  function filteredDisciplineRows() {
+    const q = disciplineSearch.trim();
+    let rows = disciplinePageCache;
+    if (q) {
+      rows = rows.filter((r) => {
+        const typeLbl = disciplineTypeLabel(r.type);
+        return (
+          String(r.studentName || '').includes(q) ||
+          String(r.classTitle || '').includes(q) ||
+          String(r.note || '').includes(q) ||
+          typeLbl.includes(q)
+        );
+      });
+    }
+    return rows;
+  }
+
+  function disciplineTypeOptions(selected) {
+    return DISCIPLINE_TYPES.map(
+      ([v, l]) => `<option value="${v}" ${String(selected) === v ? 'selected' : ''}>${l}</option>`
+    ).join('');
+  }
+
+  const disciplineModalClassOptions = (selectedClassId) =>
+    disciplineClassesCache
+      .map(
+        (c) =>
+          `<option value="${esc(c.id)}" ${String(c.id) === String(selectedClassId) ? 'selected' : ''}>${esc(c.title)}</option>`
+      )
+      .join('');
+
+  function disciplineFormBody(d = {}) {
+    const dateVal = d.recordDate || d.date || today();
+    const classId = d.classId || disciplinePageClassId || disciplineClassesCache[0]?.id || '';
+    return `<label>کلاس<select name="classId" required>${disciplineModalClassOptions(classId)}</select></label><label>دانش‌آموز${studentComboboxHtml(d.studentId || '', 'نام را تایپ کنید…')}</label><label>نوع<select name="type" required>${disciplineTypeOptions(d.type || 'positive')}</select></label><label>تاریخ<span data-jalali-date="recordDate" data-value="${esc(dateVal)}" data-required></span></label><label class="form-stack">شرح یادداشت<textarea name="note" rows="3" minlength="3" maxlength="1000" placeholder="برای مثال: مشارکت خوب در حل تمرین گروهی" required>${esc(d.note || '')}</textarea></label>`;
+  }
+
+  function readDisciplineBody(form) {
+    const d = new FormData(form);
+    const combobox = $('[data-student-combobox]', form);
+    const studentId = $('input[type="hidden"]', combobox)?.value;
+    return {
+      classId: String(d.get('classId') || form.querySelector('[name="classId"]')?.value || '').trim(),
+      studentId: String(studentId || '').trim(),
+      type: String(d.get('type') || '').trim(),
+      recordDate: String(d.get('recordDate') || '').trim(),
+      note: String(d.get('note') || '').trim(),
+    };
+  }
+
+  function bindDisciplineModalCombobox(form, initialClassId, selectedStudentId, onClassChange) {
+    let students = [];
+    const combobox = $('[data-student-combobox]', form);
+    const classSelect = form.querySelector('[name="classId"]');
+    const ctl = wireStudentCombobox(combobox, {
+      students: [],
+      allowEmpty: false,
+      onChange: () => {},
+    });
+    const load = async () => {
+      const cid = classSelect?.value;
+      if (!cid) {
+        ctl.setStudents([]);
+        ctl.setValue('');
+        return;
+      }
+      students = await API.students(cid);
+      ctl.setStudents(students);
+      if (selectedStudentId && students.some((s) => String(s.id) === String(selectedStudentId))) {
+        ctl.setValue(selectedStudentId);
+        selectedStudentId = '';
+      } else if (students.length === 1) ctl.setValue(students[0].id);
+    };
+    classSelect?.addEventListener('change', async () => {
+      ctl.setValue('');
+      await load();
+      onClassChange?.();
+    });
+    return { load, ctl };
+  }
+
+  function paintDisciplineTable() {
+    const host = $('#discipline-table-host');
+    const pager = $('#discipline-pagination');
+    if (!host || !pager) return;
+    const rows = filteredDisciplineRows();
+    const total = rows.length;
+    const totalPages = Math.max(1, Math.ceil(total / DISCIPLINE_PAGE_SIZE));
+    if (disciplineListPage > totalPages) disciplineListPage = totalPages;
+    if (disciplineListPage < 1) disciplineListPage = 1;
+    const start = (disciplineListPage - 1) * DISCIPLINE_PAGE_SIZE;
+    const pageRows = rows.slice(start, start + DISCIPLINE_PAGE_SIZE);
+    const notePreview = (n) => {
+      const t = String(n || '');
+      return t.length > 80 ? esc(t.slice(0, 80)) + '…' : esc(t);
+    };
+    host.innerHTML = pageRows.length
+      ? `<div class="table-wrap"><table class="classes-table discipline-table"><thead><tr><th>ردیف</th><th>کلاس</th><th>دانش‌آموز</th><th>نوع</th><th>تاریخ</th><th>یادداشت</th><th>عملیات</th></tr></thead><tbody>${pageRows
+          .map((r, i) => {
+            const typeCls = r.type === 'positive' ? 'discipline-type-positive' : 'discipline-type-attention';
+            return `<tr data-discipline-id="${esc(r.id)}"><td>${fa(start + i + 1)}</td><td>${esc(r.classTitle || '')}</td><td>${esc(r.studentName || '')}</td><td><span class="${typeCls}">${esc(disciplineTypeLabel(r.type))}</span></td><td>${esc(prettyDate(r.recordDate))}</td><td>${notePreview(r.note)}</td><td><div class="table-actions"><button type="button" class="btn btn-outline btn-small" data-edit-discipline="${esc(r.id)}">ویرایش</button><button type="button" class="danger-link" data-delete-discipline="${esc(r.id)}">حذف</button></div></td></tr>`;
+          })
+          .join('')}</tbody></table></div>`
+      : `<p class="empty">${total ? 'نتیجه‌ای برای فیلترها یافت نشد.' : 'هنوز یادداشتی ثبت نشده است.'}</p>`;
+    pager.innerHTML =
+      total > 0
+        ? `<span class="page-meta">${fa(total)} یادداشت • صفحه ${fa(disciplineListPage)} از ${fa(totalPages)}</span><button type="button" class="btn btn-outline btn-small" id="discipline-page-prev" ${disciplineListPage <= 1 ? 'disabled' : ''}>قبلی</button>${Array.from({ length: totalPages }, (_, i) => i + 1)
+            .filter((p) => p === 1 || p === totalPages || Math.abs(p - disciplineListPage) <= 1)
+            .reduce((acc, p, idx, arr) => {
+              if (idx && p - arr[idx - 1] > 1) acc.push('…');
+              acc.push(p);
+              return acc;
+            }, [])
+            .map((p) =>
+              typeof p === 'number'
+                ? `<button type="button" class="btn btn-outline btn-small discipline-page-num ${p === disciplineListPage ? 'active' : ''}" data-page="${p}">${fa(p)}</button>`
+                : `<span class="page-ellipsis">${p}</span>`
+            )
+            .join('')}<button type="button" class="btn btn-outline btn-small" id="discipline-page-next" ${disciplineListPage >= totalPages ? 'disabled' : ''}>بعدی</button>`
+        : '';
+    bindDisciplineTableActions();
+    $('#discipline-page-prev')?.addEventListener('click', () => {
+      if (disciplineListPage > 1) {
+        disciplineListPage--;
+        paintDisciplineTable();
+      }
+    });
+    $('#discipline-page-next')?.addEventListener('click', () => {
+      if (disciplineListPage < totalPages) {
+        disciplineListPage++;
+        paintDisciplineTable();
+      }
+    });
+    $$('.discipline-page-num', pager).forEach((b) =>
+      b.addEventListener('click', () => {
+        disciplineListPage = Number(b.dataset.page) || 1;
+        paintDisciplineTable();
+      })
+    );
+  }
+
+  function bindDisciplineTableActions() {
+    const reload = async () => {
+      const sid = disciplineScopeSchoolId();
+      disciplinePageCache = await fetchDisciplineForFilter(sid, disciplinePageClassId, disciplinePageStudentId);
+      paintDisciplineTable();
+    };
+    $$('[data-edit-discipline]').forEach((b) =>
+      b.onclick = () => openDisciplineEditor(disciplinePageCache.find((x) => String(x.id) === b.dataset.editDiscipline), reload)
+    );
+    $$('[data-delete-discipline]').forEach((b) => {
+      b.onclick = async () => {
+        const r = disciplinePageCache.find((x) => String(x.id) === b.dataset.deleteDiscipline);
+        if (!r || !confirm('این یادداشت حذف شود؟')) return;
+        b.disabled = true;
+        try {
+          await API.deleteDiscipline(r.id);
+          await reload();
+          toast('یادداشت حذف شد.');
+        } catch (err) {
+          toast(err.message);
+          b.disabled = false;
+        }
+      };
+    });
+  }
+
+  function openDisciplineEditor(record, onSuccess) {
+    if (!record?.id) return;
+    const op = showModal(
+      `<h2 id="modal-title">ویرایش یادداشت انضباطی</h2><form id="discipline-edit-form" class="form-stack">${disciplineFormBody(record)}<div class="quick-links"><button type="submit" class="btn btn-green">ذخیره</button><button type="button" class="btn btn-outline modal-close">انصراف</button></div></form>`
+    );
+    const form = $('#discipline-edit-form');
+    const { load, ctl } = bindDisciplineModalCombobox(form, record.classId, record.studentId);
+    load();
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const body = readDisciplineBody(form);
+      if (!body.studentId) {
+        toast('دانش‌آموز را انتخاب کنید.');
+        return;
+      }
+      if (body.note.length < 3) {
+        toast('شرح یادداشت باید حداقل ۳ حرف داشته باشد.');
+        return;
+      }
+      const submit = $('button[type="submit"]', form);
+      submit.disabled = true;
+      try {
+        await API.saveDiscipline({ ...body, id: record.id });
+        if (op !== currentModalOp) return;
+        closeModal();
+        await onSuccess?.();
+        toast('یادداشت به‌روز شد.');
+      } catch (err) {
+        toast(err.message);
+      } finally {
+        submit.disabled = false;
+      }
+    };
+    $$('.modal-close', form).forEach((b) => (b.onclick = closeModal));
+  }
+
+  function openDisciplineCreateModal() {
+    const defaultClass = disciplinePageClassId || disciplineClassesCache[0]?.id || '';
+    const op = showModal(
+      `<h2 id="modal-title">یادداشت انضباطی جدید</h2><p>کلاس، دانش‌آموز و جزئیات یادداشت را وارد کنید.</p><form id="discipline-create-form" class="form-stack">${disciplineFormBody({ classId: defaultClass })}<div class="quick-links"><button type="submit" class="btn btn-green">ثبت یادداشت</button><button type="button" class="btn btn-outline modal-close">انصراف</button></div></form>`
+    );
+    const form = $('#discipline-create-form');
+    const { load } = bindDisciplineModalCombobox(form, defaultClass, '');
+    load();
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const body = readDisciplineBody(form);
+      if (!body.classId || !body.studentId) {
+        toast('کلاس و دانش‌آموز را مشخص کنید.');
+        return;
+      }
+      if (body.note.length < 3) {
+        toast('شرح یادداشت باید حداقل ۳ حرف داشته باشد.');
+        return;
+      }
+      const btn = $('button[type="submit"]', form);
+      btn.disabled = true;
+      try {
+        await API.createDiscipline(body, body.classId);
+        if (op !== currentModalOp) return;
+        closeModal();
+        const sid = disciplineScopeSchoolId();
+        disciplinePageCache = await fetchDisciplineForFilter(sid, disciplinePageClassId, disciplinePageStudentId);
+        disciplineListPage = 1;
+        paintDisciplineTable();
+        toast('یادداشت ثبت شد.');
+      } catch (err) {
+        toast(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+    $$('.modal-close', form).forEach((b) => (b.onclick = closeModal));
+  }
 
   const normalizeSessionRow = (s) => ({
     ...s,
@@ -1287,89 +1630,89 @@
   }
 
   async function renderDiscipline(version) {
-    if (!school.id) {
-      $('#panel-body').innerHTML = `<div class="notice">برای ثبت انضباط ابتدا مدرسه را تنظیم کنید.</div>${panelLink('#panel/settings', 'تنظیمات مدرسه')}`;
-      upgradeJalaliFields($('#panel-body'));
-      return;
-    }
-    if (!classes.length) {
-      $('#panel-body').innerHTML = noClassesNotice();
-      upgradeJalaliFields($('#panel-body'));
-      return;
-    }
-    let records;
+    const body = $('#panel-body');
     try {
-      records = await API.discipline();
+      schools = await API.schools();
     } catch (e) {
-      $('#panel-body').innerHTML = error(e);
+      body.innerHTML = error(e);
+      return;
+    }
+    if (!school.id) {
+      body.innerHTML = `<div class="notice">برای ثبت انضباط ابتدا مدرسه را تنظیم کنید.</div>${panelLink('#panel/settings', 'تنظیمات مدرسه')}`;
+      upgradeJalaliFields(body);
+      return;
+    }
+    const scopeSchoolId = disciplineScopeSchoolId();
+    if (!scopeSchoolId) {
+      body.innerHTML = `<div class="notice">مدرسهٔ فعال مشخص نیست.</div>${panelLink('#panel/settings', 'انتخاب مدرسه')}`;
+      upgradeJalaliFields(body);
+      return;
+    }
+    if (
+      disciplinePageClassId &&
+      disciplineClassesCache.length &&
+      !disciplineClassesCache.some((c) => String(c.id) === String(disciplinePageClassId))
+    ) {
+      disciplinePageClassId = '';
+      disciplinePageStudentId = '';
+    }
+    try {
+      disciplineClassesCache = await fetchClassesForFilter(scopeSchoolId);
+      classes = disciplineClassesCache;
+      disciplineStudentsCache = await fetchStudentsForFilter(scopeSchoolId, disciplinePageClassId);
+      disciplinePageCache = await fetchDisciplineForFilter(
+        scopeSchoolId,
+        disciplinePageClassId,
+        disciplinePageStudentId
+      );
+    } catch (e) {
+      body.innerHTML = error(e);
       return;
     }
     if (version !== routeVersion) return;
-    $('#panel-body').innerHTML = `<div class="surface"><h2>ثبت یادداشت انضباطی</h2><form id="discipline-form"><div class="form-row"><label>کلاس<select id="discipline-class" required>${classOptions()}</select></label><label>دانش‌آموز<select id="discipline-student" required></select></label><label>نوع یادداشت<select name="type"><option value="positive">تشویق</option><option value="attention">نیاز به پیگیری</option></select></label><label>تاریخ<span data-jalali-date="date" data-value="${today()}" data-required></span></label></div><label class="form-stack">شرح یادداشت<textarea name="note" rows="3" minlength="3" maxlength="1000" placeholder="برای مثال: مشارکت خوب در حل تمرین گروهی" required></textarea></label><div class="save-bar"><button class="btn btn-green" id="discipline-save" type="submit" disabled>ثبت یادداشت</button><span id="discipline-form-status" role="status"></span></div></form></div><div class="surface"><h2>یادداشت‌های ثبت‌شده</h2><div id="discipline-records"></div></div>`;
-    upgradeJalaliFields($('#panel-body'));
-    let studentLoad = 0;
-    const loadStudents = async () => {
-      const op = ++studentLoad;
-      $('#discipline-student').disabled = true;
-      $('#discipline-save').disabled = true;
-      try {
-        const data = await API.students($('#discipline-class').value);
-        if (version !== routeVersion || op !== studentLoad) return;
-        $('#discipline-student').innerHTML = data.length
-          ? data.map((s) => `<option value="${esc(s.id)}">${esc(studentDisplayName(s))}</option>`).join('')
-          : '<option value="">بدون دانش‌آموز</option>';
-        $('#discipline-student').disabled = false;
-        $('#discipline-save').disabled = !data.length;
-        $('#discipline-form-status').textContent = '';
-      } catch (e) {
-        if (version === routeVersion) $('#discipline-form-status').textContent = e.message;
-      }
+    if (!disciplineClassesCache.length) {
+      body.innerHTML = noClassesNotice();
+      upgradeJalaliFields(body);
+      return;
+    }
+    body.innerHTML = `<div class="surface classes-page"><div class="classes-toolbar"><div class="form-row classes-filters"><label>کلاس<select id="discipline-filter-class">${disciplineClassFilterOptions(disciplinePageClassId)}</select></label><label class="classes-search-wrap">دانش‌آموز<div id="discipline-student-filter">${studentComboboxHtml(disciplinePageStudentId, 'جستجو یا انتخاب نام…')}</div></label><label class="classes-search-wrap">جستجو<div class="search classes-search">${searchFieldIcon()}<input id="discipline-search" type="search" placeholder="نام، کلاس، متن یادداشت…" value="${esc(disciplineSearch)}" autocomplete="off"></div></label></div><button type="button" class="btn btn-green btn-with-icon" id="discipline-create-open">${btnNew('یادداشت جدید')}</button></div><div id="discipline-table-host"></div><div id="discipline-pagination" class="pagination"></div></div>`;
+    const reloadRows = async () => {
+      const sid = disciplineScopeSchoolId();
+      disciplinePageCache = await fetchDisciplineForFilter(sid, disciplinePageClassId, disciplinePageStudentId);
+      paintDisciplineTable();
     };
-    $('#discipline-class').onchange = loadStudents;
-    const renderRecords = () => {
-      $('#discipline-records').innerHTML = records.length
-        ? records
-          .map(
-            (r) =>
-              `<article class="record"><div class="record-head"><strong>${esc(r.studentName)}</strong><span class="badge">${r.type === 'positive' ? 'تشویق' : 'نیاز به پیگیری'}</span></div><small>${esc(classBy(r.classId)?.title || '')} • ${esc(prettyDate(r.date))}</small><p>${esc(r.note)}</p></article>`
-          )
-          .join('')
-        : '<p class="help">هنوز یادداشتی ثبت نشده است.</p>';
+    const filterWrap = $('#discipline-student-filter');
+    const filterCtl = wireStudentCombobox(filterWrap, {
+      students: disciplineStudentsCache,
+      allowEmpty: true,
+      emptyLabel: 'همه دانش‌آموزان',
+      onChange: async (id) => {
+        disciplinePageStudentId = id || '';
+        disciplineListPage = 1;
+        if (version !== routeVersion) return;
+        await reloadRows();
+      },
+    });
+    filterCtl.setValue(disciplinePageStudentId);
+    $('#discipline-filter-class').onchange = async () => {
+      disciplinePageClassId = $('#discipline-filter-class').value;
+      disciplinePageStudentId = '';
+      disciplineListPage = 1;
+      const sid = disciplineScopeSchoolId();
+      disciplineStudentsCache = await fetchStudentsForFilter(sid, disciplinePageClassId);
+      filterCtl.setStudents(disciplineStudentsCache);
+      filterCtl.setValue('');
+      if (version !== routeVersion) return;
+      await reloadRows();
     };
-    renderRecords();
-    $('#discipline-form').onsubmit = async (e) => {
-      e.preventDefault();
-      const f = e.target,
-        d = new FormData(f),
-        note = d.get('note').trim();
-      if (note.length < 3) {
-        toast('شرح یادداشت باید حداقل ۳ حرف داشته باشد.');
-        return;
-      }
-      const btn = $('#discipline-save');
-      btn.disabled = true;
-      try {
-        const r = await API.addDiscipline({
-          classId: $('#discipline-class').value,
-          studentId: $('#discipline-student').value,
-          studentName: $('#discipline-student').selectedOptions[0].textContent,
-          type: d.get('type'),
-          date: d.get('date'),
-          note,
-        });
-        if (version === routeVersion) {
-          records.unshift(r);
-          renderRecords();
-          f.elements.note.value = '';
-          toast('یادداشت ثبت شد.');
-        }
-      } catch (e) {
-        toast(e.message);
-      } finally {
-        if (version === routeVersion) btn.disabled = false;
-      }
+    $('#discipline-search').oninput = (e) => {
+      disciplineSearch = e.target.value;
+      disciplineListPage = 1;
+      paintDisciplineTable();
     };
-    await loadStudents();
+    $('#discipline-create-open').onclick = openDisciplineCreateModal;
+    upgradeJalaliFields(body);
+    paintDisciplineTable();
   }
 
   async function renderSchedule(version) {

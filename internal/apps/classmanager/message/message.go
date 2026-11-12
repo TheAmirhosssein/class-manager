@@ -24,4 +24,9 @@ var (
 
 	AttendanceRead  = messages.NewMessage(200_601, "")
 	AttendanceSaved = messages.NewMessage(200_602, "")
+
+	DisciplineRead    = messages.NewMessage(200_701, "")
+	DisciplineCreated = messages.NewMessage(201_701, "یادداشت انضباطی ثبت شد")
+	DisciplineUpdated = messages.NewMessage(200_702, "یادداشت به‌روز شد")
+	DisciplineDeleted = messages.NewMessage(200_703, "یادداشت حذف شد")
 )

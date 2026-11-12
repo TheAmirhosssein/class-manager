@@ -147,3 +147,34 @@ type SetAttendanceRecordParams struct {
 	StudentID       types.ID
 	Status          string
 }
+
+type ListDisciplineParams struct {
+	Actor     OwnerActor
+	SchoolID  types.ID
+	ClassID   types.ID
+	StudentID types.ID
+}
+
+type CreateDisciplineParams struct {
+	Actor      OwnerActor
+	ClassID    types.ID
+	StudentID  types.ID
+	Type       string
+	RecordDate string
+	Note       string
+}
+
+type UpdateDisciplineParams struct {
+	Actor      OwnerActor
+	RecordID   types.ID
+	ClassID    types.ID
+	StudentID  types.ID
+	Type       string
+	RecordDate string
+	Note       string
+}
+
+type DeleteDisciplineParams struct {
+	Actor    OwnerActor
+	RecordID types.ID
+}
