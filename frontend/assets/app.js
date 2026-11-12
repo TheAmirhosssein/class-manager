@@ -58,10 +58,6 @@
   });
   $('#modal')?.addEventListener('cancel', () => currentModalOp++);
 
-  function setSchool() {
-    $('#school-label').textContent = school.name || 'مدرسه شما';
-  }
-
   async function loadPanelData() {
     try {
       schools = await API.schools();
@@ -80,7 +76,6 @@
       }
       classes = [];
       schedule = [];
-      setSchool();
       return !!school?.id;
     } catch (e) {
       if (/مدرسه‌ای برای حساب|یافت نشد/i.test(e.message)) {
@@ -90,7 +85,6 @@
         schedule = [];
         API.setActiveSchool('');
         sessionStorage.removeItem('classino.schoolId');
-        setSchool();
         return false;
       }
       throw e;
@@ -112,20 +106,26 @@
   function updateHeaderAuth() {
     const btn = $('#login-button');
     const brand = $('#brand-link');
+    const headerUser = $('#header-user');
+    const headerName = $('#header-user-name');
+    const sidebarName = $('#sidebar-user-name');
     if (isLoggedIn()) {
-      if (btn) {
-        btn.textContent = user.name;
-        btn.setAttribute('href', '#panel');
-      }
+      if (headerName) headerName.textContent = user.name;
+      if (sidebarName) sidebarName.textContent = user.name;
+      if (headerUser) headerUser.hidden = false;
+      if (btn) btn.hidden = true;
       if (brand) {
         brand.setAttribute('href', '#panel');
         brand.setAttribute('aria-label', 'کلاسینو، پنل مدیریت');
       }
     } else {
+      if (headerUser) headerUser.hidden = true;
       if (btn) {
+        btn.hidden = false;
         btn.innerHTML = 'ورود <span aria-hidden="true">↗</span>';
         btn.setAttribute('href', '#login');
       }
+      if (sidebarName) sidebarName.textContent = '—';
       if (brand) {
         brand.setAttribute('href', '#login');
         brand.setAttribute('aria-label', 'کلاسینو، صفحه ورود');
@@ -649,7 +649,6 @@
           API.setActiveSchool(school.id);
           sessionStorage.setItem('classino.schoolId', String(school.id));
         }
-        setSchool();
         await loadPanelData();
         await renderSettings();
       } catch (err) {

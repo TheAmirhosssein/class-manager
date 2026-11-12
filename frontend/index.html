@@ -21,8 +21,13 @@
       <a class="brand" href="#login" id="brand-link" aria-label="کلاسینو"><span
           class="brand-icon">⌂</span><span>کلاس<span class="green">ینو</span><small>مدیریت کلاس و
             آموزش</small></span></a>
-      <div class="header-actions"><a href="#login" class="btn btn-dark" id="login-button">ورود <span
-            aria-hidden="true">↗</span></a></div>
+      <div class="header-actions">
+        <div id="header-user" class="header-user" hidden>
+          <span class="header-user-greet">سلام،</span>
+          <strong id="header-user-name"></strong>
+        </div>
+        <a href="#login" class="btn btn-dark" id="login-button">ورود <span aria-hidden="true">↗</span></a>
+      </div>
     </div>
   </header>
   <main id="main" tabindex="-1">
@@ -62,7 +67,13 @@
     </section>
     <section id="panel-view" class="panel-shell container" hidden>
       <aside class="sidebar">
-        <div class="school-symbol">⌂</div><strong id="school-label">مدرسه شما</strong><small>فضای مدیریت آموزشی</small>
+        <div class="sidebar-user">
+          <div class="school-symbol" aria-hidden="true">⌂</div>
+          <div>
+            <strong id="sidebar-user-name">—</strong>
+            <small>حساب مدرس</small>
+          </div>
+        </div>
         <nav aria-label="منوی پنل"><a href="#panel" data-panel="overview">◫ <span>نمای کلی</span></a><a
             href="#panel/classes" data-panel="classes">▦ <span>کلاس‌ها</span></a><a href="#panel/attendance"
             data-panel="attendance">☑ <span>حضور و غیاب</span></a><a href="#panel/discipline" data-panel="discipline">◎

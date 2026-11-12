@@ -102,7 +102,7 @@ func ensureSampleSchool(ctx context.Context, db *sql.DB, ownerUserID int64) erro
 		SELECT id FROM schools WHERE owner_user_id = ? ORDER BY id LIMIT 1`, ownerUserID).Scan(&schoolID)
 	if database.IsNoRows(err) {
 		res, insErr := db.ExecContext(ctx, `
-			INSERT INTO schools (name, owner_user_id) VALUES (?, ?)`, "مدرسه نمونه", ownerUserID)
+			INSERT INTO schools (name, owner_user_id) VALUES (?, ?)`, "مدرسه من", ownerUserID)
 		if insErr != nil {
 			return insErr
 		}
