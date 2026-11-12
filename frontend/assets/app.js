@@ -30,13 +30,25 @@
   }
   function updateHeaderAuth(){
     const btn=$('#login-button');
-    if(!btn)return;
+    const brand=$('#brand-link');
     if(isLoggedIn()){
-      btn.textContent=user.name;
-      btn.setAttribute('href','#login/account');
+      if(btn){
+        btn.textContent=user.name;
+        btn.setAttribute('href','#panel');
+      }
+      if(brand){
+        brand.setAttribute('href','#panel');
+        brand.setAttribute('aria-label','کلاسینو، پنل مدیریت');
+      }
     }else{
-      btn.innerHTML='ورود <span aria-hidden="true">↗</span>';
-      btn.setAttribute('href','#login');
+      if(btn){
+        btn.innerHTML='ورود <span aria-hidden="true">↗</span>';
+        btn.setAttribute('href','#login');
+      }
+      if(brand){
+        brand.setAttribute('href','#login');
+        brand.setAttribute('aria-label','کلاسینو، صفحه ورود');
+      }
     }
   }
   async function refreshSession(){
@@ -45,8 +57,12 @@
       else user=null;
       return;
     }
-    const session=await API.session();
-    user=session?.user||null;
+    try {
+      const session=await API.session();
+      user=session?.user||null;
+    } catch {
+      user=null;
+    }
   }
   function completeLogin(nextUser){
     user=nextUser;
@@ -127,9 +143,11 @@
     const hash=location.hash.slice(1)||'login';
     const parts=hash.split('/');
     if(parts[0]==='login'){
+      if(parts[1]==='logout'){await logout();return;}
       if(parts[1]==='register'){location.replace('#login');return;}
       await refreshSession();
-      renderLoginPage(parts[1]==='account'?'account':'login');
+      if(isLoggedIn()){location.replace('#panel');return;}
+      renderLoginPage('login');
       updateHeaderAuth();
       return;
     }
@@ -177,9 +195,17 @@
   $('#demo-enter')?.addEventListener('click',()=>completeLogin({id:'demo',name:'مدرس نمونه',role:'teacher'}));
   $('#logout-button')?.addEventListener('click',logout);
   async function init(){
-    if(!APP_CONFIG.demo){$('.subtle-tag').hidden=true;$('.demo-note').hidden=true;$('#mode-label').textContent='متصل به سامانه';}
-    try{[classes,schedule,school]=await Promise.all([API.classes(),API.schedule(),API.school()]);setSchool();}catch(e){$('#panel-body').innerHTML=error(e)+'<button class="btn btn-outline" id="reload-data">تلاش دوباره</button>';$('#reload-data').onclick=()=>location.reload();}
-    if(!location.hash||location.hash==='#'||location.hash==='#home')location.hash='login';
+    if(!APP_CONFIG.demo){
+      $('.subtle-tag').hidden=true;$('.demo-note').hidden=true;$('#mode-label').textContent='متصل به سامانه';
+      classes=[];schedule=[];school={name:'مدرسه نمونه'};setSchool();
+    }else{
+      try{[classes,schedule,school]=await Promise.all([API.classes(),API.schedule(),API.school()]);setSchool();}catch(e){$('#panel-body').innerHTML=error(e)+'<button class="btn btn-outline" id="reload-data">تلاش دوباره</button>';$('#reload-data').onclick=()=>location.reload();}
+    }
+    await refreshSession();
+    updateHeaderAuth();
+    if(!location.hash||location.hash==='#'||location.hash==='#home'){
+      location.hash=isLoggedIn()?'panel':'login';
+    }
     window.addEventListener('hashchange',route);
     await route();
   }
