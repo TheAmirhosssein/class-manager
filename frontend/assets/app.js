@@ -32,7 +32,23 @@
     classesSearch = '',
     classesListPage = 1;
   const CLASSES_PAGE_SIZE = 10;
+  let studentsPageClassId = '',
+    studentsPageCache = [],
+    studentsClassesCache = [],
+    studentsSearch = '',
+    studentsListPage = 1;
+  const STUDENTS_PAGE_SIZE = 10;
+  const faStudentCollator = new Intl.Collator('fa', { sensitivity: 'base', numeric: true });
+  const studentsScopeSchoolId = () => API.activeSchool() || school?.id || schools[0]?.id || '';
+  const sortStudentsPersian = (list) =>
+    [...list].sort((a, b) => {
+      const byLast = faStudentCollator.compare(a.lastName || '', b.lastName || '');
+      if (byLast !== 0) return byLast;
+      return faStudentCollator.compare(a.firstName || '', b.firstName || '');
+    });
   const classBy = (id) => classes.find((x) => String(x.id) === String(id));
+  const studentDisplayName = (s) =>
+    String(s?.name || '').trim() || [s?.firstName, s?.lastName].filter(Boolean).join(' ').trim();
   const classOptions = () => classes.map((x) => `<option value="${esc(x.id)}">${esc(x.title)}</option>`).join('');
   const gradeOptions = (selected = '') =>
     ['7', '8', '9', '10', '11', '12']
@@ -93,6 +109,197 @@
     return batches.flat();
   }
 
+  async function fetchStudentsForFilter(schoolId, classId) {
+    studentsClassesCache = await fetchClassesForFilter(schoolId);
+    const scope = classId
+      ? studentsClassesCache.filter((c) => String(c.id) === String(classId))
+      : studentsClassesCache;
+    if (!scope.length) return [];
+    const batches = await Promise.all(
+      scope.map(async (c) => {
+        const list = await API.students(c.id);
+        return list.map((s) => ({
+          ...s,
+          classTitle: c.title,
+          classGrade: c.grade,
+          schoolName: c.schoolName || '',
+        }));
+      })
+    );
+    return sortStudentsPersian(batches.flat());
+  }
+
+  const studentClassFilterOptions = (selectedClassId) =>
+    `<option value="" ${selectedClassId === '' || selectedClassId === undefined ? 'selected' : ''}>همه کلاس‌ها</option>${studentsClassesCache
+      .map(
+        (c) =>
+          `<option value="${esc(c.id)}" ${String(c.id) === String(selectedClassId) ? 'selected' : ''}>${esc(c.title)}</option>`
+      )
+      .join('')}`;
+
+  function filteredStudentsRows() {
+    const q = studentsSearch.trim();
+    const rows = q
+      ? studentsPageCache.filter((s) => {
+          const name = studentDisplayName(s);
+          return String(name).includes(q) || String(s.firstName || '').includes(q) || String(s.lastName || '').includes(q);
+        })
+      : studentsPageCache;
+    return sortStudentsPersian(rows);
+  }
+
+  function paintStudentsTable() {
+    const host = $('#students-table-host');
+    const pager = $('#students-pagination');
+    if (!host || !pager) return;
+    const rows = filteredStudentsRows();
+    const total = rows.length;
+    const totalPages = Math.max(1, Math.ceil(total / STUDENTS_PAGE_SIZE));
+    if (studentsListPage > totalPages) studentsListPage = totalPages;
+    if (studentsListPage < 1) studentsListPage = 1;
+    const start = (studentsListPage - 1) * STUDENTS_PAGE_SIZE;
+    const pageRows = rows.slice(start, start + STUDENTS_PAGE_SIZE);
+    host.innerHTML = pageRows.length
+      ? `<div class="table-wrap"><table class="classes-table students-table"><thead><tr><th>ردیف</th><th>کلاس</th><th>نام</th><th>نام خانوادگی</th><th>کد ملی</th><th>نام پدر</th><th>شماره</th><th>عملیات</th></tr></thead><tbody>${pageRows
+          .map((s, i) => {
+            const nc = s.nationalCode ? fa(s.nationalCode) : '—';
+            const father = s.fatherName ? esc(s.fatherName) : '—';
+            const num = s.studentNumber ? fa(s.studentNumber) : '—';
+            return `<tr data-student-id="${esc(s.id)}"><td>${fa(start + i + 1)}</td><td>${esc(s.classTitle || '')}</td><td>${esc(s.firstName || '')}</td><td>${esc(s.lastName || '')}</td><td>${nc}</td><td>${father}</td><td>${num}</td><td><div class="table-actions"><button type="button" class="btn btn-outline btn-small" data-edit-student="${esc(s.id)}">ویرایش</button><button type="button" class="danger-link" data-delete-student="${esc(s.id)}">حذف</button></div></td></tr>`;
+          })
+          .join('')}</tbody></table></div>`
+      : `<p class="empty">${total ? 'نتیجه‌ای برای فیلترها یافت نشد.' : 'دانش‌آموزی ثبت نشده است.'}</p>`;
+    pager.innerHTML =
+      total > 0
+        ? `<span class="page-meta">${fa(total)} دانش‌آموز • صفحه ${fa(studentsListPage)} از ${fa(totalPages)}</span><button type="button" class="btn btn-outline btn-small" id="students-page-prev" ${studentsListPage <= 1 ? 'disabled' : ''}>قبلی</button>${Array.from({ length: totalPages }, (_, i) => i + 1)
+            .filter((p) => p === 1 || p === totalPages || Math.abs(p - studentsListPage) <= 1)
+            .reduce((acc, p, idx, arr) => {
+              if (idx && p - arr[idx - 1] > 1) acc.push('…');
+              acc.push(p);
+              return acc;
+            }, [])
+            .map((p) =>
+              typeof p === 'number'
+                ? `<button type="button" class="btn btn-outline btn-small students-page-num ${p === studentsListPage ? 'active' : ''}" data-page="${p}">${fa(p)}</button>`
+                : `<span class="page-ellipsis">${p}</span>`
+            )
+            .join('')}<button type="button" class="btn btn-outline btn-small" id="students-page-next" ${studentsListPage >= totalPages ? 'disabled' : ''}>بعدی</button>`
+        : '';
+    bindStudentsTableActions();
+    $('#students-page-prev')?.addEventListener('click', () => {
+      if (studentsListPage > 1) {
+        studentsListPage--;
+        paintStudentsTable();
+      }
+    });
+    $('#students-page-next')?.addEventListener('click', () => {
+      if (studentsListPage < totalPages) {
+        studentsListPage++;
+        paintStudentsTable();
+      }
+    });
+    $$('.students-page-num', pager).forEach((b) =>
+      b.addEventListener('click', () => {
+        studentsListPage = Number(b.dataset.page) || 1;
+        paintStudentsTable();
+      })
+    );
+  }
+
+  function bindStudentsTableActions() {
+    const reload = async () => {
+      const sid = studentsScopeSchoolId();
+      studentsPageCache = await fetchStudentsForFilter(sid, studentsPageClassId);
+      classesPageCache = await fetchClassesForFilter(sid);
+      classes = classesPageCache;
+      paintStudentsTable();
+    };
+    $$('[data-edit-student]').forEach((b) => {
+      b.onclick = () => openStudentEditor(studentsPageCache.find((x) => String(x.id) === b.dataset.editStudent), reload);
+    });
+    $$('[data-delete-student]').forEach((b) => {
+      b.onclick = async () => {
+        const s = studentsPageCache.find((x) => String(x.id) === b.dataset.deleteStudent);
+        if (!s || !confirm(`«${studentDisplayName(s)}» حذف شود؟`)) return;
+        b.disabled = true;
+        try {
+          await API.deleteStudent(s.id);
+          await reload();
+          toast('دانش‌آموز حذف شد.');
+        } catch (err) {
+          toast(err.message);
+          b.disabled = false;
+        }
+      };
+    });
+  }
+
+  function openStudentEditor(studentData, onSuccess) {
+    if (!studentData?.id) return;
+    const op = showModal(
+      `<h2 id="modal-title">ویرایش دانش‌آموز</h2><form id="student-edit-form" class="form-stack">${studentFormFields(studentData)}<div class="quick-links"><button type="submit" class="btn btn-green">ذخیره</button><button type="button" class="btn btn-outline modal-close">انصراف</button></div></form>`
+    );
+    const form = $('#student-edit-form');
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const body = readStudentBody(form);
+      if (!nationalCodeClientOk(body.nationalCode)) {
+        toast('کد ملی باید ۱۰ رقم باشد یا خالی بماند.');
+        return;
+      }
+      const submit = $('button[type="submit"]', form);
+      submit.disabled = true;
+      try {
+        await API.saveStudent({ ...body, id: studentData.id });
+        if (op !== currentModalOp) return;
+        closeModal();
+        await onSuccess?.();
+        toast('دانش‌آموز به‌روز شد.');
+      } catch (err) {
+        toast(err.message);
+      } finally {
+        submit.disabled = false;
+      }
+    };
+    $$('.modal-close', form).forEach((b) => (b.onclick = closeModal));
+  }
+
+  function openStudentCreateModal() {
+    const defaultClass = studentsPageClassId || studentsClassesCache[0]?.id || '';
+    const op = showModal(
+      `<h2 id="modal-title">دانش‌آموز جدید</h2><p>کلاس و مشخصات دانش‌آموز را وارد کنید.</p><form id="student-create-form" class="form-stack"><label>کلاس<select name="classId" required>${studentClassFilterOptions(defaultClass)}</select></label>${studentFormFields()}<div class="quick-links"><button type="submit" class="btn btn-green">ثبت دانش‌آموز</button><button type="button" class="btn btn-outline modal-close">انصراف</button></div></form>`
+    );
+    const form = $('#student-create-form');
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const classId = form.querySelector('[name="classId"]').value;
+      const body = readStudentBody(form);
+      if (!nationalCodeClientOk(body.nationalCode)) {
+        toast('کد ملی باید ۱۰ رقم باشد یا خالی بماند.');
+        return;
+      }
+      const btn = $('button[type="submit"]', form);
+      btn.disabled = true;
+      try {
+        await API.createStudent(body, classId);
+        if (op !== currentModalOp) return;
+        closeModal();
+        const sid = studentsScopeSchoolId();
+        studentsPageCache = await fetchStudentsForFilter(sid, studentsPageClassId);
+        classesPageCache = await fetchClassesForFilter(sid);
+        classes = classesPageCache;
+        studentsListPage = 1;
+        paintStudentsTable();
+        toast('دانش‌آموز ثبت شد.');
+      } catch (err) {
+        toast(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+    $$('.modal-close', form).forEach((b) => (b.onclick = closeModal));
+  }
+
   function filteredClassesRows() {
     const q = classesSearch.trim();
     if (!q) return classesPageCache;
@@ -113,27 +320,27 @@
     const showSchool = !classesPageSchoolId;
     host.innerHTML = pageRows.length
       ? `<div class="table-wrap"><table class="classes-table"><thead><tr><th>ردیف</th>${showSchool ? '<th>مدرسه</th>' : ''}<th>عنوان</th><th>پایه</th><th>اتاق</th><th>دانش‌آموز</th><th>عملیات</th></tr></thead><tbody>${pageRows
-          .map((c, i) => {
-            const room = c.room ? esc(c.room) : '—';
-            return `<tr data-class-id="${esc(c.id)}"><td>${fa(start + i + 1)}</td>${showSchool ? `<td>${esc(c.schoolName || '')}</td>` : ''}<td>${esc(c.title)}</td><td>${fa(c.grade)}</td><td>${room}</td><td>${fa(c.studentCount ?? 0)}</td><td><div class="table-actions"><button type="button" class="btn btn-outline btn-small" data-attend-class="${esc(c.id)}">حضور</button><button type="button" class="btn btn-outline btn-small" data-edit-class="${esc(c.id)}">ویرایش</button><button type="button" class="danger-link" data-delete-class="${esc(c.id)}">حذف</button></div></td></tr>`;
-          })
-          .join('')}</tbody></table></div>`
+        .map((c, i) => {
+          const room = c.room ? esc(c.room) : '—';
+          return `<tr data-class-id="${esc(c.id)}"><td>${fa(start + i + 1)}</td>${showSchool ? `<td>${esc(c.schoolName || '')}</td>` : ''}<td>${esc(c.title)}</td><td>${fa(c.grade)}</td><td>${room}</td><td>${fa(c.studentCount ?? 0)}</td><td><div class="table-actions"><button type="button" class="btn btn-outline btn-small" data-manage-students="${esc(c.id)}">دانش‌آموزان</button><button type="button" class="btn btn-outline btn-small" data-attend-class="${esc(c.id)}">حضور</button><button type="button" class="btn btn-outline btn-small" data-edit-class="${esc(c.id)}">ویرایش</button><button type="button" class="danger-link" data-delete-class="${esc(c.id)}">حذف</button></div></td></tr>`;
+        })
+        .join('')}</tbody></table></div>`
       : `<p class="empty">${total ? 'نتیجه‌ای برای جستجو یافت نشد.' : 'کلاسی ثبت نشده است.'}</p>`;
     pager.innerHTML =
       total > 0
         ? `<span class="page-meta">${fa(total)} کلاس • صفحه ${fa(classesListPage)} از ${fa(totalPages)}</span><button type="button" class="btn btn-outline btn-small" id="classes-page-prev" ${classesListPage <= 1 ? 'disabled' : ''}>قبلی</button>${Array.from({ length: totalPages }, (_, i) => i + 1)
-            .filter((p) => p === 1 || p === totalPages || Math.abs(p - classesListPage) <= 1)
-            .reduce((acc, p, idx, arr) => {
-              if (idx && p - arr[idx - 1] > 1) acc.push('…');
-              acc.push(p);
-              return acc;
-            }, [])
-            .map((p) =>
-              typeof p === 'number'
-                ? `<button type="button" class="btn btn-outline btn-small classes-page-num ${p === classesListPage ? 'active' : ''}" data-page="${p}">${fa(p)}</button>`
-                : `<span class="page-ellipsis">${p}</span>`
-            )
-            .join('')}<button type="button" class="btn btn-outline btn-small" id="classes-page-next" ${classesListPage >= totalPages ? 'disabled' : ''}>بعدی</button>`
+          .filter((p) => p === 1 || p === totalPages || Math.abs(p - classesListPage) <= 1)
+          .reduce((acc, p, idx, arr) => {
+            if (idx && p - arr[idx - 1] > 1) acc.push('…');
+            acc.push(p);
+            return acc;
+          }, [])
+          .map((p) =>
+            typeof p === 'number'
+              ? `<button type="button" class="btn btn-outline btn-small classes-page-num ${p === classesListPage ? 'active' : ''}" data-page="${p}">${fa(p)}</button>`
+              : `<span class="page-ellipsis">${p}</span>`
+          )
+          .join('')}<button type="button" class="btn btn-outline btn-small" id="classes-page-next" ${classesListPage >= totalPages ? 'disabled' : ''}>بعدی</button>`
         : '';
     bindClassesTableActions();
     $('#classes-page-prev')?.addEventListener('click', () => {
@@ -157,31 +364,32 @@
   }
 
   function bindClassesTableActions() {
+    $$('[data-manage-students]').forEach((b) => (b.onclick = () => openClassStudents(classBy(b.dataset.manageStudents))));
     $$('[data-attend-class]').forEach(
       (b) =>
-        (b.onclick = () => {
-          sessionStorage.setItem('classino.selectedClass', b.dataset.attendClass);
-          location.hash = 'panel/attendance';
-        })
+      (b.onclick = () => {
+        sessionStorage.setItem('classino.selectedClass', b.dataset.attendClass);
+        location.hash = 'panel/attendance';
+      })
     );
     $$('[data-edit-class]').forEach((b) => (b.onclick = () => openClassEditor(classBy(b.dataset.editClass))));
     $$('[data-delete-class]').forEach(
       (b) =>
-        (b.onclick = async () => {
-          const c = classBy(b.dataset.deleteClass);
-          if (!c || !confirm(`کلاس «${c.title}» حذف شود؟ دانش‌آموزان و سوابق وابسته هم حذف می‌شوند.`)) return;
-          b.disabled = true;
-          try {
-            await API.deleteClass(c.id);
-            classesPageCache = await fetchClassesForFilter(classesPageSchoolId);
-            classes = classesPageCache;
-            paintClassesTable();
-            toast('کلاس حذف شد.');
-          } catch (err) {
-            toast(err.message);
-            b.disabled = false;
-          }
-        })
+      (b.onclick = async () => {
+        const c = classBy(b.dataset.deleteClass);
+        if (!c || !confirm(`کلاس «${c.title}» حذف شود؟ دانش‌آموزان و سوابق وابسته هم حذف می‌شوند.`)) return;
+        b.disabled = true;
+        try {
+          await API.deleteClass(c.id);
+          classesPageCache = await fetchClassesForFilter(classesPageSchoolId);
+          classes = classesPageCache;
+          paintClassesTable();
+          toast('کلاس حذف شد.');
+        } catch (err) {
+          toast(err.message);
+          b.disabled = false;
+        }
+      })
     );
   }
 
@@ -344,6 +552,7 @@
     const titles = {
       overview: 'نمای کلی',
       classes: 'کلاس‌ها',
+      students: 'دانش‌آموزان',
       attendance: 'حضور و غیاب',
       discipline: 'انضباط',
       schedule: 'برنامه کلاسی',
@@ -369,6 +578,7 @@
       if (version !== routeVersion) return;
       if (tab === 'overview') renderOverview();
       if (tab === 'classes') await renderClasses();
+      if (tab === 'students') await renderStudents();
       if (tab === 'attendance') await renderAttendance(version);
       if (tab === 'discipline') await renderDiscipline(version);
       if (tab === 'schedule') await renderSchedule(version);
@@ -420,7 +630,7 @@
         '<div class="notice">هنوز مدرسه‌ای نساخته‌اید. از بخش «نام مدرسه» یک مدرسه بسازید.</div><a href="#panel/settings" class="btn btn-green">ساخت مدرسه ←</a>';
       return;
     }
-  const total = classes.reduce((n, c) => n + c.studentCount, 0);
+    const total = classes.reduce((n, c) => n + c.studentCount, 0);
     $('#panel-body').innerHTML = `<div class="stats"><div class="stat"><b>${fa(classes.length)}</b><span>کلاس آموزشی</span></div><div class="stat"><b>${fa(total)}</b><span>عضویت در کلاس‌ها</span></div><div class="stat"><b>${fa(schedule.length)}</b><span>بازه در برنامه هفتگی</span></div></div><div class="surface"><div class="eyebrow">سلام، ${esc(user.name)}</div><h2>یک روز تازه، یک فرصت برای یادگیری</h2><p>کلاس‌های مدرسهٔ «${esc(school.name)}» را از بخش کلاس‌ها مدیریت کنید؛ حضور، برنامه و انضباط به‌زودی به API وصل می‌شوند.</p><div class="quick-links"><a href="#panel/classes" class="btn btn-green">کلاس‌ها ←</a><a href="#panel/settings" class="btn btn-outline">تنظیمات مدرسه</a></div></div>`;
   }
 
@@ -468,6 +678,147 @@
       toast('کلاس به‌روز شد.');
     });
     $$('.modal-close', form).forEach((b) => (b.onclick = closeModal));
+  }
+
+  function studentFormFields(s = {}) {
+    return `<label>نام<input name="firstName" value="${esc(s.firstName || '')}" minlength="2" maxlength="60" required placeholder="مثلاً علی"></label><label>نام خانوادگی<input name="lastName" value="${esc(s.lastName || '')}" minlength="2" maxlength="60" required placeholder="مثلاً رضایی"></label><label>کد ملی<input name="nationalCode" value="${esc(s.nationalCode || '')}" inputmode="numeric" maxlength="10" placeholder="اختیاری — ۱۰ رقم"></label><label>نام پدر<input name="fatherName" value="${esc(s.fatherName || '')}" maxlength="60" placeholder="اختیاری"></label><label>شماره دانش‌آموزی<input name="studentNumber" value="${esc(s.studentNumber || '')}" maxlength="20" placeholder="اختیاری"></label>`;
+  }
+
+  function nationalCodeClientOk(code) {
+    const n = normalizeDigits(code);
+    if (!n) return true;
+    return n.length === 10;
+  }
+
+  function normalizeDigits(v) {
+    const persian = '۰۱۲۳۴۵۶۷۸۹';
+    return String(v || '')
+      .replace(/[۰-۹]/g, (d) => String(persian.indexOf(d)))
+      .replace(/\D/g, '');
+  }
+
+  function readStudentBody(form) {
+    const d = new FormData(form);
+    return {
+      firstName: String(d.get('firstName') || '').trim(),
+      lastName: String(d.get('lastName') || '').trim(),
+      nationalCode: normalizeDigits(d.get('nationalCode')),
+      fatherName: String(d.get('fatherName') || '').trim(),
+      studentNumber: String(d.get('studentNumber') || '').trim(),
+    };
+  }
+
+  async function refreshClassStudentCount(classId) {
+    classesPageCache = await fetchClassesForFilter(classesPageSchoolId);
+    classes = classesPageCache;
+    paintClassesTable();
+    return classBy(classId);
+  }
+
+  async function openClassStudents(classData) {
+    if (!classData?.id) return;
+    let roster = [];
+    const paintRoster = () => {
+      const host = $('#class-students-table');
+      if (!host) return;
+      host.innerHTML = roster.length
+        ? `<div class="table-wrap"><table><thead><tr><th>ردیف</th><th>نام و نام خانوادگی</th><th>کد ملی</th><th>نام پدر</th><th>شماره</th><th>عملیات</th></tr></thead><tbody>${roster
+          .map(
+            (s, i) =>
+              `<tr data-student-row="${esc(s.id)}"><td>${fa(i + 1)}</td><td>${esc(studentDisplayName(s))}</td><td>${s.nationalCode ? fa(s.nationalCode) : '—'}</td><td>${s.fatherName ? esc(s.fatherName) : '—'}</td><td>${s.studentNumber ? fa(s.studentNumber) : '—'}</td><td><div class="table-actions"><button type="button" class="btn btn-outline btn-small" data-edit-student="${esc(s.id)}">ویرایش</button><button type="button" class="danger-link" data-delete-student="${esc(s.id)}">حذف</button></div></td></tr>`
+          )
+          .join('')}</tbody></table></div>`
+        : '<p class="empty">هنوز دانش‌آموزی در این کلاس ثبت نشده است.</p>';
+      $$('[data-edit-student]', host).forEach((btn) => {
+        btn.onclick = () => {
+          const s = roster.find((x) => String(x.id) === btn.dataset.editStudent);
+          if (!s) return;
+          const editOp = showModal(
+            `<h2 id="modal-title">ویرایش دانش‌آموز</h2><form id="student-edit-form" class="form-stack">${studentFormFields(s)}<div class="quick-links"><button type="submit" class="btn btn-green">ذخیره</button><button type="button" class="btn btn-outline modal-close">انصراف</button></div></form>`
+          );
+          const form = $('#student-edit-form');
+          form.onsubmit = async (e) => {
+            e.preventDefault();
+            const body = readStudentBody(form);
+            if (!nationalCodeClientOk(body.nationalCode)) {
+              toast('کد ملی باید ۱۰ رقم باشد یا خالی بماند.');
+              return;
+            }
+            const submit = $('button[type="submit"]', form);
+            submit.disabled = true;
+            try {
+              await API.saveStudent({ ...body, id: s.id });
+              if (editOp !== currentModalOp) return;
+              closeModal();
+              roster = await API.students(classData.id);
+              paintRoster();
+              await refreshClassStudentCount(classData.id);
+              toast('دانش‌آموز به‌روز شد.');
+            } catch (err) {
+              toast(err.message);
+            } finally {
+              submit.disabled = false;
+            }
+          };
+          $$('.modal-close', form).forEach((b) => (b.onclick = closeModal));
+        };
+      });
+      $$('[data-delete-student]', host).forEach((btn) => {
+        btn.onclick = async () => {
+          const s = roster.find((x) => String(x.id) === btn.dataset.deleteStudent);
+          if (!s || !confirm(`«${studentDisplayName(s)}» از این کلاس حذف شود؟`)) return;
+          btn.disabled = true;
+          try {
+            await API.deleteStudent(s.id);
+            roster = await API.students(classData.id);
+            paintRoster();
+            await refreshClassStudentCount(classData.id);
+            toast('دانش‌آموز حذف شد.');
+          } catch (err) {
+            toast(err.message);
+            btn.disabled = false;
+          }
+        };
+      });
+    };
+    const op = showModal(
+      `<h2 id="modal-title">دانش‌آموزان — ${esc(classData.title)}</h2><p class="help">پایه ${fa(classData.grade)}${classData.room ? ` • ${esc(classData.room)}` : ''}</p><div id="class-students-table"></div><h3>افزودن دانش‌آموز</h3><form id="student-create-form" class="form-stack">${studentFormFields()}<div class="quick-links"><button type="submit" class="btn btn-green">ثبت دانش‌آموز</button><button type="button" class="btn btn-outline modal-close">بستن</button></div></form>`
+    );
+    try {
+      roster = await API.students(classData.id);
+      if (op !== currentModalOp) return;
+      paintRoster();
+    } catch (e) {
+      if (op === currentModalOp) {
+        $('#class-students-table').innerHTML = error(e);
+      }
+      return;
+    }
+    const createForm = $('#student-create-form');
+    createForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const body = readStudentBody(createForm);
+      if (!nationalCodeClientOk(body.nationalCode)) {
+        toast('کد ملی باید ۱۰ رقم باشد یا خالی بماند.');
+        return;
+      }
+      const btn = $('button[type="submit"]', createForm);
+      btn.disabled = true;
+      try {
+        await API.createStudent(body, classData.id);
+        if (op !== currentModalOp) return;
+        createForm.reset();
+        roster = await API.students(classData.id);
+        paintRoster();
+        await refreshClassStudentCount(classData.id);
+        toast('دانش‌آموز ثبت شد.');
+      } catch (err) {
+        toast(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+    $$('.modal-close', createForm).forEach((b) => (b.onclick = closeModal));
   }
 
   function openClassCreateModal() {
@@ -543,6 +894,64 @@
     }
   }
 
+  async function renderStudents() {
+    const body = $('#panel-body');
+    try {
+      schools = await API.schools();
+    } catch (e) {
+      body.innerHTML = error(e);
+      return;
+    }
+    if (!schools.length) {
+      body.innerHTML =
+        '<div class="notice">برای ثبت دانش‌آموز، ابتدا یک مدرسه بسازید.</div><a href="#panel/settings" class="btn btn-green">تنظیمات مدرسه ←</a>';
+      return;
+    }
+    const scopeSchoolId = studentsScopeSchoolId();
+    if (!scopeSchoolId) {
+      body.innerHTML =
+        '<div class="notice">مدرسهٔ فعال مشخص نیست.</div><a href="#panel/settings" class="btn btn-green">انتخاب مدرسه ←</a>';
+      return;
+    }
+    if (
+      studentsPageClassId &&
+      studentsClassesCache.length &&
+      !studentsClassesCache.some((c) => String(c.id) === String(studentsPageClassId))
+    ) {
+      studentsPageClassId = '';
+    }
+    try {
+      studentsPageCache = await fetchStudentsForFilter(scopeSchoolId, studentsPageClassId);
+    } catch (e) {
+      body.innerHTML = error(e);
+      return;
+    }
+    body.innerHTML = `<div class="surface classes-page"><div class="classes-toolbar"><div class="form-row classes-filters"><label>کلاس<select id="student-filter-class">${studentClassFilterOptions(studentsPageClassId)}</select></label><label class="classes-search-wrap">جستجوی نام<div class="search classes-search"><span aria-hidden="true">⌕</span><input id="student-search" type="search" placeholder="نام یا نام خانوادگی…" value="${esc(studentsSearch)}" autocomplete="off"></div></label></div><button type="button" class="btn btn-green" id="student-create-open">دانش‌آموز جدید +</button></div><div id="students-table-host"></div><div id="students-pagination" class="pagination"></div></div>`;
+    const reloadCache = async () => {
+      const sid = studentsScopeSchoolId();
+      studentsPageCache = await fetchStudentsForFilter(sid, studentsPageClassId);
+      $('#student-filter-class').innerHTML = studentClassFilterOptions(studentsPageClassId);
+      classes = await fetchClassesForFilter(sid);
+      paintStudentsTable();
+    };
+    $('#student-filter-class').onchange = async () => {
+      studentsPageClassId = $('#student-filter-class').value;
+      studentsListPage = 1;
+      try {
+        await reloadCache();
+      } catch (err) {
+        toast(err.message);
+      }
+    };
+    $('#student-search').oninput = (e) => {
+      studentsSearch = e.target.value;
+      studentsListPage = 1;
+      paintStudentsTable();
+    };
+    $('#student-create-open').onclick = openStudentCreateModal;
+    paintStudentsTable();
+  }
+
   async function renderAttendance(version) {
     if (!school.id) {
       $('#panel-body').innerHTML =
@@ -581,18 +990,19 @@
         $('#attendance-caption').textContent = 'تاریخ جلسه: ' + prettyDate(date);
         $('#attendance-table').innerHTML = students.length
           ? `<div class="table-wrap"><table><thead><tr><th>ردیف</th><th>نام دانش‌آموز</th><th>وضعیت حضور</th></tr></thead><tbody>${students
-              .map((s, i) => {
-                const status = existing.records.find((x) => x.studentId === s.id)?.status || '';
-                return `<tr><td>${fa(i + 1)}</td><td>${esc(s.name)}</td><td><select data-student="${esc(s.id)}" aria-label="وضعیت ${esc(s.name)}"><option value="">انتخاب وضعیت</option>${[
-                  ['present', 'حاضر'],
-                  ['absent', 'غایب'],
-                  ['late', 'تأخیر'],
-                  ['excused', 'غیبت موجه'],
-                ]
-                  .map(([v, l]) => `<option value="${v}" ${v === status ? 'selected' : ''}>${l}</option>`)
-                  .join('')}</select></td></tr>`;
-              })
-              .join('')}</tbody></table></div>`
+            .map((s, i) => {
+              const status = existing.records.find((x) => x.studentId === s.id)?.status || '';
+              const nm = studentDisplayName(s);
+              return `<tr><td>${fa(i + 1)}</td><td>${esc(nm)}</td><td><select data-student="${esc(s.id)}" aria-label="وضعیت ${esc(nm)}"><option value="">انتخاب وضعیت</option>${[
+                ['present', 'حاضر'],
+                ['absent', 'غایب'],
+                ['late', 'تأخیر'],
+                ['excused', 'غیبت موجه'],
+              ]
+                .map(([v, l]) => `<option value="${v}" ${v === status ? 'selected' : ''}>${l}</option>`)
+                .join('')}</select></td></tr>`;
+            })
+            .join('')}</tbody></table></div>`
           : '<p class="empty">دانش‌آموزی در این کلاس ثبت نشده است.</p>';
         $('#attendance-save').disabled = !students.length;
         $('#attendance-status').textContent = existing.records.length
@@ -685,7 +1095,7 @@
         const data = await API.students($('#discipline-class').value);
         if (version !== routeVersion || op !== studentLoad) return;
         $('#discipline-student').innerHTML = data.length
-          ? data.map((s) => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('')
+          ? data.map((s) => `<option value="${esc(s.id)}">${esc(studentDisplayName(s))}</option>`).join('')
           : '<option value="">بدون دانش‌آموز</option>';
         $('#discipline-student').disabled = false;
         $('#discipline-save').disabled = !data.length;
@@ -698,11 +1108,11 @@
     const renderRecords = () => {
       $('#discipline-records').innerHTML = records.length
         ? records
-            .map(
-              (r) =>
-                `<article class="record"><div class="record-head"><strong>${esc(r.studentName)}</strong><span class="badge">${r.type === 'positive' ? 'تشویق' : 'نیاز به پیگیری'}</span></div><small>${esc(classBy(r.classId)?.title || '')} • ${esc(prettyDate(r.date))}</small><p>${esc(r.note)}</p></article>`
-            )
-            .join('')
+          .map(
+            (r) =>
+              `<article class="record"><div class="record-head"><strong>${esc(r.studentName)}</strong><span class="badge">${r.type === 'positive' ? 'تشویق' : 'نیاز به پیگیری'}</span></div><small>${esc(classBy(r.classId)?.title || '')} • ${esc(prettyDate(r.date))}</small><p>${esc(r.note)}</p></article>`
+          )
+          .join('')
         : '<p class="help">هنوز یادداشتی ثبت نشده است.</p>';
     };
     renderRecords();
@@ -762,12 +1172,12 @@
     const table = () => {
       $('#schedule-table').innerHTML = schedule.length
         ? `<div class="table-wrap"><table><thead><tr><th>روز</th><th>کلاس</th><th>ساعت</th><th>موضوع</th><th>عملیات</th></tr></thead><tbody>${[...schedule]
-            .sort((a, b) => a.day - b.day || a.start.localeCompare(b.start))
-            .map(
-              (s) =>
-                `<tr><td>${days[s.day]}</td><td>${esc(classBy(s.classId)?.title || '')}</td><td>${fa(s.start)} تا ${fa(s.end)}</td><td>${esc(s.topic)}</td><td><button class="danger-link" data-remove="${esc(s.id)}" aria-label="حذف جلسه ${esc(s.topic)}">حذف</button></td></tr>`
-            )
-            .join('')}</tbody></table></div>`
+          .sort((a, b) => a.day - b.day || a.start.localeCompare(b.start))
+          .map(
+            (s) =>
+              `<tr><td>${days[s.day]}</td><td>${esc(classBy(s.classId)?.title || '')}</td><td>${fa(s.start)} تا ${fa(s.end)}</td><td>${esc(s.topic)}</td><td><button class="danger-link" data-remove="${esc(s.id)}" aria-label="حذف جلسه ${esc(s.topic)}">حذف</button></td></tr>`
+          )
+          .join('')}</tbody></table></div>`
         : '<p class="empty">هنوز برنامه‌ای ثبت نشده است.</p>';
     };
     table();
@@ -837,22 +1247,22 @@
     const creating = !school.id;
     const list = schools.length
       ? `<div class="surface"><h2>مدارس شما</h2><p>فقط مدرسه‌هایی که خودتان ساخته‌اید در اینجا دیده می‌شوند.</p><ul class="school-list">${schools
-          .map(
-            (s) =>
-              `<li><button type="button" class="btn btn-outline btn-small school-pick" data-school-id="${esc(s.id)}" ${String(s.id) === String(school.id) ? 'aria-current="true"' : ''}>${esc(s.name)}</button></li>`
-          )
-          .join('')}</ul></div>`
+        .map(
+          (s) =>
+            `<li><button type="button" class="btn btn-outline btn-small school-pick" data-school-id="${esc(s.id)}" ${String(s.id) === String(school.id) ? 'aria-current="true"' : ''}>${esc(s.name)}</button></li>`
+        )
+        .join('')}</ul></div>`
       : '';
     $('#panel-body').innerHTML = `${list}<div class="surface"><h2>${creating ? 'ساخت مدرسه' : 'ویرایش مدرسه فعال'}</h2><p>${creating ? 'با ساخت مدرسه، مالک آن می‌شوید و دیگر کاربران به آن دسترسی ندارند.' : 'نام مدرسهٔ انتخاب‌شده در سایدبار نمایش داده می‌شود.'}</p><form id="school-form" class="form-stack"><label>نام مدرسه<input name="name" value="${esc(school.name || '')}" minlength="2" maxlength="80" required placeholder="مثلاً دبیرستان نمونه"></label><div class="quick-links"><button class="btn btn-green" type="submit">${creating ? 'ساخت مدرسه' : 'ذخیره نام'}</button>${!creating ? '<button type="button" class="btn btn-outline" id="school-create-another">مدرسهٔ دیگر</button>' : ''}</div></form></div>`;
     $$('.school-pick').forEach(
       (b) =>
-        (b.onclick = async () => {
-          API.setActiveSchool(b.dataset.schoolId);
-          sessionStorage.setItem('classino.schoolId', b.dataset.schoolId);
-          await loadPanelData();
-          await renderSettings();
-          toast('مدرسه فعال تغییر کرد.');
-        })
+      (b.onclick = async () => {
+        API.setActiveSchool(b.dataset.schoolId);
+        sessionStorage.setItem('classino.schoolId', b.dataset.schoolId);
+        await loadPanelData();
+        await renderSettings();
+        toast('مدرسه فعال تغییر کرد.');
+      })
     );
     let forceCreate = false;
     $('#school-create-another')?.addEventListener('click', () => {
@@ -904,7 +1314,7 @@
     if (isLoggedIn()) {
       try {
         await loadPanelData();
-      } catch {}
+      } catch { }
     }
     updateHeaderAuth();
     if (!location.hash || location.hash === '#' || location.hash === '#home') {

@@ -11,4 +11,9 @@ var (
 	ClassCreated = messages.NewMessage(201_301, "کلاس ایجاد شد")
 	ClassUpdated = messages.NewMessage(200_302, "کلاس به‌روز شد")
 	ClassDeleted = messages.NewMessage(200_303, "کلاس حذف شد")
+
+	StudentRead    = messages.NewMessage(200_401, "")
+	StudentCreated = messages.NewMessage(201_401, "دانش‌آموز ثبت شد")
+	StudentUpdated = messages.NewMessage(200_402, "دانش‌آموز به‌روز شد")
+	StudentDeleted = messages.NewMessage(200_403, "دانش‌آموز حذف شد")
 )

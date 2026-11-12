@@ -15,10 +15,13 @@ import (
 func Register(engine *gin.Engine, cfg *config.Config, db *sql.DB, tokens *jwt.Service) {
 	schoolRepo := repository.NewSchoolRepository(db)
 	classRepo := repository.NewClassRepository(db)
+	studentRepo := repository.NewStudentRepository(db)
 	schoolUC := usecase.NewSchoolUsecase(schoolRepo)
 	classUC := usecase.NewClassUsecase(classRepo, schoolRepo)
+	studentUC := usecase.NewStudentUsecase(studentRepo, classRepo, schoolRepo)
 	schoolH := handler.NewSchoolHandler(schoolUC)
 	classH := handler.NewClassHandler(classUC)
+	studentH := handler.NewStudentHandler(studentUC)
 
 	cookieName := cfg.JWT.CookieName
 	api := engine.Group("/api/v1")
@@ -31,6 +34,8 @@ func Register(engine *gin.Engine, cfg *config.Config, db *sql.DB, tokens *jwt.Se
 	secured.GET("/school", schoolH.Get)
 	secured.GET("/classes", classH.List)
 	secured.GET("/class", classH.Get)
+	secured.GET("/students", studentH.List)
+	secured.GET("/student", studentH.Get)
 
 	writes := secured.Group("")
 	writes.Use(middleware.CSRFRequired())
@@ -39,4 +44,7 @@ func Register(engine *gin.Engine, cfg *config.Config, db *sql.DB, tokens *jwt.Se
 	writes.POST("/class", classH.Create)
 	writes.PATCH("/class", classH.Patch)
 	writes.DELETE("/class", classH.Delete)
+	writes.POST("/student", studentH.Create)
+	writes.PATCH("/student", studentH.Patch)
+	writes.DELETE("/student", studentH.Delete)
 }

@@ -84,7 +84,26 @@
     deleteClass: (classId) => request('/class?classId=' + enc(classId), { method: 'DELETE', body: {} }),
     schedule: () => Promise.resolve([]),
     courses: () => Promise.resolve([]),
-    students: () => Promise.resolve([]),
+    students: (classId) => {
+      if (!classId) return Promise.resolve([]);
+      return request('/students?classId=' + enc(String(classId)));
+    },
+    student: (studentId) => request('/student?studentId=' + enc(studentId)),
+    createStudent: (body, classId) =>
+      request('/student?classId=' + enc(String(classId)), { method: 'POST', body }),
+    saveStudent: (body) =>
+      request('/student?studentId=' + enc(body.id || ''), {
+        method: 'PATCH',
+        body: {
+          firstName: body.firstName,
+          lastName: body.lastName,
+          nationalCode: body.nationalCode,
+          fatherName: body.fatherName || '',
+          studentNumber: body.studentNumber || '',
+          id: body.id,
+        },
+      }),
+    deleteStudent: (studentId) => request('/student?studentId=' + enc(studentId), { method: 'DELETE', body: {} }),
     addSchedule: notImplemented('برنامه کلاسی'),
     removeSchedule: notImplemented('برنامه کلاسی'),
     attendance: notImplemented('حضور و غیاب'),

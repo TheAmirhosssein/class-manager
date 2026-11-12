@@ -11,4 +11,8 @@ var (
 
 	ClassNotFound     = messages.NewMessageByError(404_301, "کلاس یافت نشد.")
 	InvalidClassInput = messages.NewMessageByError(422_301, "اطلاعات کلاس نامعتبر است.")
+
+	StudentNotFound       = messages.NewMessageByError(404_401, "دانش‌آموز یافت نشد.")
+	InvalidStudentInput   = messages.NewMessageByError(422_401, "اطلاعات دانش‌آموز نامعتبر است.")
+	NationalCodeTaken     = messages.NewMessageByError(409_401, "این کد ملی قبلاً ثبت شده است.")
 )

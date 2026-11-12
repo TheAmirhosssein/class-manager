@@ -61,3 +61,39 @@ type DeleteClassParams struct {
 	Actor   OwnerActor
 	ClassID types.ID
 }
+
+type ListStudentsParams struct {
+	Actor   OwnerActor
+	ClassID types.ID
+}
+
+type ReadStudentParams struct {
+	Actor     OwnerActor
+	StudentID types.ID
+}
+
+type CreateStudentParams struct {
+	Actor         OwnerActor
+	ClassID       types.ID
+	FirstName     string
+	LastName      string
+	NationalCode  string
+	FatherName    string
+	StudentNumber string
+}
+
+type UpdateStudentParams struct {
+	Actor         OwnerActor
+	StudentID     types.ID
+	ClassID       types.ID
+	FirstName     string
+	LastName      string
+	NationalCode  string
+	FatherName    string
+	StudentNumber string
+}
+
+type DeleteStudentParams struct {
+	Actor     OwnerActor
+	StudentID types.ID
+}
