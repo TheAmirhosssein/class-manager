@@ -71,6 +71,42 @@
         </div>
       </aside>
     </section>
+    <section id="admin-view" class="login-shell container" hidden aria-labelledby="admin-heading">
+      <div class="login-card admin-card">
+        <div class="login-card-head">
+          <div class="eyebrow"><span class="dot"></span> مدیریت سامانه</div>
+          <h1 id="admin-heading">ورود مدیر</h1>
+          <p class="login-lead">فقط افزودن حساب مدرس — بدون دسترسی به پنل کلاس.</p>
+        </div>
+        <div id="admin-login-forms">
+          <form id="admin-auth-form" class="form-stack login-form">
+            <label>شماره موبایل<input name="mobile" type="tel" inputmode="numeric" autocomplete="tel" dir="ltr"
+                placeholder="09123456789" pattern="09[0-9]{9}" required></label>
+            <label>رمز عبور<input name="password" type="password" autocomplete="current-password" required></label>
+            <p id="admin-auth-status" class="inline-status" role="status"></p>
+            <button type="submit" class="btn btn-green btn-block btn-with-icon" id="admin-auth-submit"><span data-icon="log-in"
+                data-icon-class="icon" aria-hidden="true"></span>ورود مدیر</button>
+          </form>
+        </div>
+        <div id="admin-console" hidden>
+          <p class="help">وارد شده‌اید به‌عنوان <strong id="admin-account-name"></strong></p>
+          <h2 class="admin-console-title">افزودن مدرس</h2>
+          <form id="admin-create-user-form" class="form-stack login-form">
+            <label>نام و نام خانوادگی<input name="name" required minlength="2" maxlength="80" autocomplete="name"></label>
+            <label>شماره موبایل<input name="mobile" type="tel" inputmode="numeric" dir="ltr" pattern="09[0-9]{9}"
+                required autocomplete="tel"></label>
+            <label>رمز عبور<input name="password" type="password" minlength="8" required autocomplete="new-password"></label>
+            <p id="admin-create-status" class="inline-status" role="status"></p>
+            <button type="submit" class="btn btn-green btn-block btn-with-icon" id="admin-create-submit"><span data-icon="plus"
+                data-icon-class="icon" aria-hidden="true"></span>ایجاد حساب مدرس</button>
+          </form>
+          <div class="quick-links" style="margin-top:20px">
+            <button type="button" class="btn btn-outline btn-with-icon" id="admin-logout-button"><span data-icon="log-out"
+                data-icon-class="icon" aria-hidden="true"></span>خروج</button>
+          </div>
+        </div>
+      </div>
+    </section>
     <section id="panel-view" class="panel-shell container" hidden>
       <aside class="sidebar">
         <div class="sidebar-user">

@@ -4,4 +4,6 @@ window.APP_CONFIG = Object.freeze({
   credentials: 'same-origin',
   csrfCookie: 'csrftoken',
   csrfHeader: 'X-CSRFToken',
+  // Must match server admin.path_secret / ADMIN_PATH_SECRET
+  adminPathSecret: 'sys-ingress',
 });

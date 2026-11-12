@@ -8,6 +8,10 @@
   const enc = encodeURIComponent;
   let activeSchoolId = '';
   const schoolQ = () => (activeSchoolId ? '?schoolId=' + enc(activeSchoolId) : '');
+  const adminPath = () => {
+    const s = (C.adminPathSecret || '').replace(/^\/+|\/+$/g, '');
+    return s ? '/' + s : '';
+  };
   const notImplemented = (name) => () => Promise.reject(new Error(`ماژول ${name} هنوز روی سرور فعال نیست.`));
 
   async function request(path, { method = 'GET', body } = {}) {
@@ -177,6 +181,20 @@
     deleteDiscipline: (disciplineId) =>
       request('/discipline?disciplineId=' + enc(String(disciplineId)), { method: 'DELETE', body: {} }),
     session: () => request('/auth/session'),
+    adminSession: () => request(adminPath() + '/auth/session'),
+    adminLogin: async (body) => {
+      const data = await request(adminPath() + '/auth/login', { method: 'POST', body });
+      if (data?.token) setToken(data.token);
+      return data;
+    },
+    adminLogout: async () => {
+      try {
+        await request(adminPath() + '/auth/logout', { method: 'POST', body: {} });
+      } finally {
+        setToken('');
+      }
+    },
+    createTeacherUser: (body) => request(adminPath() + '/users', { method: 'POST', body }),
     login: async (body) => {
       const data = await request('/auth/login', { method: 'POST', body });
       if (data?.token) setToken(data.token);

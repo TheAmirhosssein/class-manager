@@ -36,3 +36,12 @@ func NewUserJSON(u entity.User) UserJSON {
 		Mobile: u.Mobile,
 	}
 }
+
+func NewAdminJSON(a entity.Admin) UserJSON {
+	return UserJSON{
+		ID:     strconv.FormatInt(int64(a.ID), 10),
+		Name:   a.Name,
+		Role:   "admin",
+		Mobile: a.Mobile,
+	}
+}

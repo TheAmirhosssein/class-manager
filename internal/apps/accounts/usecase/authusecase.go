@@ -6,6 +6,7 @@ import (
 
 	"github.com/TheAmirhosssein/class-manager/internal/apps/accounts/delivery/http/handler/model"
 	"github.com/TheAmirhosssein/class-manager/internal/apps/accounts/message"
+	"github.com/TheAmirhosssein/class-manager/internal/apps/accounts/params"
 	"github.com/TheAmirhosssein/class-manager/internal/apps/accounts/repository"
 	"github.com/TheAmirhosssein/class-manager/internal/apps/accounts/validation"
 	"github.com/TheAmirhosssein/class-manager/internal/infrastructure/hash"
@@ -16,14 +17,15 @@ import (
 )
 
 type AuthUsecase struct {
-	userUC *UserUsecase
-	users  repository.UserRepository
-	hash   hash.Hash
-	tokens *jwt.Service
+	userUC  *UserUsecase
+	adminUC *AdminUsecase
+	users   repository.UserRepository
+	hash    hash.Hash
+	tokens  *jwt.Service
 }
 
-func NewAuthUsecase(userUC *UserUsecase, users repository.UserRepository, h hash.Hash, tokens *jwt.Service) *AuthUsecase {
-	return &AuthUsecase{userUC: userUC, users: users, hash: h, tokens: tokens}
+func NewAuthUsecase(userUC *UserUsecase, adminUC *AdminUsecase, users repository.UserRepository, h hash.Hash, tokens *jwt.Service) *AuthUsecase {
+	return &AuthUsecase{userUC: userUC, adminUC: adminUC, users: users, hash: h, tokens: tokens}
 }
 
 type LoginResult struct {
@@ -62,6 +64,27 @@ func (a *AuthUsecase) LoginTeacher(ctx context.Context, mobile, password string)
 	}, message.LoginSuccess
 }
 
+func (a *AuthUsecase) LoginAdmin(ctx context.Context, mobile, password string) (LoginResult, messages.Message) {
+	admin, msg := a.adminUC.Login(ctx, params.LoginAdminParams{Mobile: mobile, Password: password})
+	if msg.Error != nil {
+		return LoginResult{}, msg
+	}
+	token, err := a.tokens.Issue(jwt.IssueParams{
+		SubjectID: admin.ID,
+		Kind:      jwt.SubjectKindAdmin,
+		Role:      "admin",
+		Mobile:    admin.Mobile,
+		Name:      admin.Name,
+	})
+	if err != nil {
+		return LoginResult{}, messages.SharedServerError()
+	}
+	return LoginResult{
+		User:  model.NewAdminJSON(admin),
+		Token: token,
+	}, message.LoginSuccess
+}
+
 func (a *AuthUsecase) Session(ctx context.Context, token string) (model.UserJSON, messages.Message) {
 	claims, err := a.tokens.Parse(token)
 	if err != nil {
@@ -78,6 +101,22 @@ func (a *AuthUsecase) Session(ctx context.Context, token string) (model.UserJSON
 	return model.NewUserJSON(user), message.LoginSuccess
 }
 
+func (a *AuthUsecase) SessionAdmin(ctx context.Context, token string) (model.UserJSON, messages.Message) {
+	claims, err := a.tokens.Parse(token)
+	if err != nil {
+		return model.UserJSON{}, message.SessionInvalid
+	}
+	id, err := claims.SubjectID()
+	if err != nil || claims.Kind != jwt.SubjectKindAdmin {
+		return model.UserJSON{}, message.SessionInvalid
+	}
+	admin, msg := a.adminUC.ReadByID(ctx, id)
+	if msg.Error != nil {
+		return model.UserJSON{}, msg
+	}
+	return model.NewAdminJSON(admin), message.LoginSuccess
+}
+
 func (a *AuthUsecase) SessionFromClaims(ctx context.Context, claims jwt.Claims) (model.UserJSON, messages.Message) {
 	id, err := claims.SubjectID()
 	if err != nil {
@@ -89,6 +128,13 @@ func (a *AuthUsecase) SessionFromClaims(ctx context.Context, claims jwt.Claims) 
 			return model.UserJSON{}, msg
 		}
 		return model.NewUserJSON(user), message.LoginSuccess
+	}
+	if claims.Kind == jwt.SubjectKindAdmin {
+		admin, msg := a.adminUC.ReadByID(ctx, id)
+		if msg.Error != nil {
+			return model.UserJSON{}, msg
+		}
+		return model.NewAdminJSON(admin), message.LoginSuccess
 	}
 	return model.UserJSON{
 		ID:     strconv.FormatInt(int64(id), 10),

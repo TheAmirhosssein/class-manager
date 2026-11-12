@@ -22,7 +22,7 @@ func RegisterHealth(engine *gin.Engine, db *sql.DB) {
 	})
 }
 
-func RegisterFrontend(engine *gin.Engine, frontendDir string) {
+func RegisterFrontend(engine *gin.Engine, frontendDir, adminEntryPath string) {
 	if frontendDir == "" {
 		return
 	}
@@ -34,6 +34,12 @@ func RegisterFrontend(engine *gin.Engine, frontendDir string) {
 		engine.Static("/assets", assetsDir)
 	}
 	index := filepath.Join(frontendDir, "index.html")
+	if adminEntryPath != "" {
+		entry := adminEntryPath
+		engine.GET("/"+entry, func(c *gin.Context) {
+			c.Redirect(http.StatusFound, "/#"+entry)
+		})
+	}
 	engine.GET("/", func(c *gin.Context) {
 		c.File(index)
 	})

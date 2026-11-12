@@ -18,8 +18,11 @@ func Register(engine *gin.Engine, cfg *config.Config, db *sql.DB, tokens *jwt.Se
 	userRepo := repository.NewUserRepository(db)
 	adminRepo := repository.NewAdminRepository(db)
 	users := usecase.NewUserUsecase(userRepo, adminRepo, h)
-	authUC := usecase.NewAuthUsecase(users, userRepo, h, tokens)
+	adminUC := usecase.NewAdminUsecase(adminRepo, h)
+	authUC := usecase.NewAuthUsecase(users, adminUC, userRepo, h, tokens)
 	authH := handler.NewAuthHandler(authUC, cfg.JWT.CookieName, cfg.JWT.AccessTTL)
+	adminH := handler.NewAdminHandler(authUC, cfg.JWT.CookieName, cfg.JWT.AccessTTL)
+	userH := handler.NewUserHandler(users)
 
 	api := engine.Group("/api/v1")
 	api.Use(middleware.EnsureCSRF())
@@ -27,4 +30,13 @@ func Register(engine *gin.Engine, cfg *config.Config, db *sql.DB, tokens *jwt.Se
 	auth.POST("/login", authH.Login)
 	auth.GET("/session", authH.Session)
 	auth.POST("/logout", authH.Logout)
+
+	secret := normalizeAdminPathSecret(cfg.Admin.PathSecret)
+	adminAPI := api.Group("/" + secret)
+	adminAuth := adminAPI.Group("")
+	adminAuth.Use(middleware.AdminAccess(tokens, cfg.JWT.CookieName))
+	adminAuth.POST("/users", userH.Create)
+	adminAPI.POST("/auth/login", adminH.Login)
+	adminAPI.GET("/auth/session", adminH.Session)
+	adminAPI.POST("/auth/logout", adminH.Logout)
 }

@@ -84,6 +84,7 @@
     studentsSearch = '',
     studentsListPage = 1;
   const STUDENTS_PAGE_SIZE = 10;
+  const ADMIN_ROUTE = String(window.APP_CONFIG?.adminPathSecret || 'sys-ingress').replace(/^\/+|\/+$/g, '');
   let sessionsPageClassId = '',
     sessionsPageCache = [],
     sessionsClassesCache = [],
@@ -1131,12 +1132,35 @@
     return !!user && user.role === 'teacher';
   }
 
+  function isAdminLoggedIn() {
+    return !!user && user.role === 'admin';
+  }
+
+  function isAdminHash(hash) {
+    const parts = (hash || location.hash.slice(1)).split('/');
+    return parts[0] === ADMIN_ROUTE;
+  }
+
   function setView(mode) {
     const panel = mode === 'panel';
+    const admin = mode === 'admin';
     document.body.classList.toggle('app-panel', panel);
-    document.body.classList.toggle('app-auth', !panel);
-    $('#login-view').hidden = panel;
+    document.body.classList.toggle('app-auth', !panel && !admin);
+    $('#login-view').hidden = panel || admin;
     $('#panel-view').hidden = !panel;
+    $('#admin-view').hidden = !admin;
+  }
+
+  function setAdminView(loggedIn) {
+    setView('admin');
+    document.title = (loggedIn ? 'پنل مدیر' : 'ورود مدیر') + ' | ' + BRAND;
+    $('#admin-login-forms').hidden = loggedIn;
+    $('#admin-console').hidden = !loggedIn;
+    if (loggedIn && user) $('#admin-account-name').textContent = user.name;
+    $('#admin-heading').textContent = loggedIn ? 'پنل مدیر' : 'ورود مدیر';
+    $('#admin-auth-status').textContent = '';
+    $('#admin-create-status').textContent = '';
+    mountIcons($('#admin-view'));
   }
 
   function updateHeaderAuth() {
@@ -1179,12 +1203,34 @@
     }
   }
 
+  async function refreshAdminSession() {
+    try {
+      const session = await API.adminSession();
+      user = session?.user || null;
+    } catch {
+      user = null;
+    }
+  }
+
   function completeLogin(nextUser) {
     user = nextUser;
     updateHeaderAuth();
     const next = sessionStorage.getItem('classino.afterLogin') || 'panel';
     sessionStorage.removeItem('classino.afterLogin');
     location.hash = next.startsWith('panel') ? next : 'panel';
+  }
+
+  async function adminLogout() {
+    try {
+      await API.adminLogout();
+    } catch (e) {
+      toast(e.message);
+      return;
+    }
+    user = null;
+    $('#admin-create-user-form')?.reset();
+    setAdminView(false);
+    location.hash = ADMIN_ROUTE;
   }
 
   async function logout() {
@@ -1247,6 +1293,63 @@
     }
   }
 
+  async function submitAdminAuth(e) {
+    e.preventDefault();
+    const btn = $('#admin-auth-submit');
+    const status = $('#admin-auth-status');
+    btn.disabled = true;
+    status.textContent = '';
+    try {
+      const payload = Object.fromEntries(new FormData(e.target));
+      const result = await API.adminLogin(payload);
+      if (!result.user || result.user.role !== 'admin') {
+        status.textContent = result.message || 'ورود انجام نشد.';
+        return;
+      }
+      user = result.user;
+      setAdminView(true);
+      toast('ورود مدیر انجام شد.');
+    } catch (err) {
+      status.textContent = err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function submitAdminCreateUser(e) {
+    e.preventDefault();
+    const btn = $('#admin-create-submit');
+    const status = $('#admin-create-status');
+    btn.disabled = true;
+    status.textContent = '';
+    try {
+      if (!isAdminLoggedIn()) {
+        status.textContent = 'نشست مدیر منقضی شده است.';
+        setAdminView(false);
+        return;
+      }
+      const payload = Object.fromEntries(new FormData(e.target));
+      await API.createTeacherUser(payload);
+      e.target.reset();
+      status.textContent = 'حساب مدرس ایجاد شد.';
+      toast('مدرس جدید ثبت شد.');
+    } catch (err) {
+      status.textContent = err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function routeAdmin() {
+    await refreshAdminSession();
+    if (isAdminLoggedIn()) {
+      setAdminView(true);
+      return;
+    }
+    setAdminView(false);
+    $('#admin-auth-form')?.reset();
+  }
+
   async function routePanel() {
     const version = ++routeVersion;
     let hash = location.hash.slice(1);
@@ -1298,6 +1401,14 @@
   async function route() {
     const hash = location.hash.slice(1) || 'login';
     const parts = hash.split('/');
+    if (parts[0] === ADMIN_ROUTE) {
+      if (parts[1] === 'logout') {
+        await adminLogout();
+        return;
+      }
+      await routeAdmin();
+      return;
+    }
     if (parts[0] === 'login') {
       if (parts[1] === 'logout') {
         await logout();
@@ -1856,10 +1967,17 @@
 
   $('#auth-form').addEventListener('submit', submitAuth);
   $('#logout-button')?.addEventListener('click', logout);
+  $('#admin-auth-form')?.addEventListener('submit', submitAdminAuth);
+  $('#admin-create-user-form')?.addEventListener('submit', submitAdminCreateUser);
+  $('#admin-logout-button')?.addEventListener('click', adminLogout);
 
   async function init() {
     mountIcons(document);
-    await refreshSession();
+    if (isAdminHash(location.hash.slice(1))) {
+      await refreshAdminSession();
+    } else {
+      await refreshSession();
+    }
     if (isLoggedIn()) {
       try {
         await loadPanelData();

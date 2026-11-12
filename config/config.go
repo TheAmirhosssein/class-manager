@@ -17,6 +17,12 @@ type Config struct {
 	Database Database `yaml:"database"`
 	Frontend Frontend `yaml:"frontend"`
 	JWT      JWT      `yaml:"jwt"`
+	Admin    Admin    `yaml:"admin"`
+}
+
+// Admin holds settings for the hidden admin console (obscure path, not a security boundary).
+type Admin struct {
+	PathSecret string `yaml:"path_secret" env:"ADMIN_PATH_SECRET" env-default:"sys-ingress"`
 }
 
 type JWT struct {
