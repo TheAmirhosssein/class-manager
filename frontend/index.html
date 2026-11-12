@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="کلاسینو؛ مدیریت کلاس، حضور و غیاب و برنامه آموزشی">
+  <title>کلاسینو | پنل مدیریت</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/fonts/YekanBakh-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/config.js" defer></script><script src="assets/api.js" defer></script><script src="assets/app.js" defer></script>
+</head>
+<body class="app-auth">
+<a class="skip" href="#main">رفتن به محتوا</a>
+<header class="header"><div class="container header-inner">
+  <a class="brand" href="#login" aria-label="کلاسینو، صفحه ورود"><span class="brand-icon">⌂</span><span>کلاس<span class="green">ینو</span><small>مدیریت کلاس و آموزش</small></span></a>
+  <div class="header-actions"><a href="#login" class="btn btn-dark" id="login-button">ورود <span aria-hidden="true">↗</span></a></div>
+</div></header>
+<main id="main" tabindex="-1">
+<section id="login-view" class="login-shell container" aria-labelledby="login-heading">
+  <div class="login-card">
+    <div class="login-card-head"><div class="eyebrow"><span class="dot"></span> خوش آمدید</div><h1 id="login-heading">ورود به کلاسینو</h1><p class="login-lead">برای دسترسی به پنل مدیریت کلاس، وارد حساب خود شوید.</p></div>
+    <div id="login-account" class="login-account" hidden>
+      <p class="help">وارد شده‌اید به‌عنوان <strong id="account-name"></strong></p>
+      <div class="quick-links"><a href="#panel" class="btn btn-green">رفتن به پنل ←</a><button type="button" class="btn btn-outline" id="logout-button">خروج از حساب</button></div>
+    </div>
+    <div id="login-forms">
+      <form id="auth-form" class="form-stack login-form">
+        <label>ایمیل<input name="email" type="email" autocomplete="email" dir="ltr" required></label>
+        <label>رمز عبور<input name="password" type="password" autocomplete="current-password" required></label>
+        <p id="auth-status" class="inline-status" role="status"></p>
+        <button type="submit" class="btn btn-green btn-block" id="auth-submit">ورود</button>
+      </form>
+      <div id="demo-auth-note" class="notice">در حالت پیش‌نمایش می‌توانید با هر ایمیل و رمز نمونه وارد شوید یا از دکمه زیر استفاده کنید.</div>
+      <button type="button" class="btn btn-outline btn-block" id="demo-enter" hidden>ورود به پیش‌نمایش پنل ←</button>
+    </div>
+  </div>
+  <aside class="login-aside" aria-hidden="true">
+    <div class="login-aside-inner"><span class="login-symbol">⌂</span><h2>کلاسینو</h2><p>حضور و غیاب، برنامه هفتگی و مدیریت کلاس — همه در یک پنل ساده.</p><ul class="login-points"><li>ثبت سریع حضور هر جلسه</li><li>برنامه کلاسی بدون تداخل زمانی</li><li>یادداشت انضباطی برای هر دانش‌آموز</li></ul></div>
+  </aside>
+</section>
+<section id="panel-view" class="panel-shell container" hidden>
+  <aside class="sidebar"><div class="school-symbol">⌂</div><strong id="school-label">مدرسه نمونه</strong><small>فضای مدیریت آموزشی</small><nav aria-label="منوی پنل"><a href="#panel" data-panel="overview">◫ <span>نمای کلی</span></a><a href="#panel/classes" data-panel="classes">▦ <span>کلاس‌ها</span></a><a href="#panel/attendance" data-panel="attendance">☑ <span>حضور و غیاب</span></a><a href="#panel/discipline" data-panel="discipline">◎ <span>انضباط</span></a><a href="#panel/schedule" data-panel="schedule">▤ <span>برنامه کلاسی</span></a><a href="#panel/settings" data-panel="settings">⚙ <span>نام مدرسه</span></a></nav><div class="demo-note"><span class="dot"></span> حالت پیش‌نمایش<small>داده‌های این پنل نمونه‌اند.</small></div></aside>
+  <div class="panel-content"><div class="panel-heading"><div><div class="eyebrow">پنل کلاسینو</div><h1 id="panel-title">نمای کلی</h1></div><span class="subtle-tag" id="mode-label">نسخه نمایشی</span></div><div id="panel-body"></div></div>
+</section>
+</main>
+<dialog id="modal" aria-labelledby="modal-title"><button class="modal-close icon-btn" aria-label="بستن پنجره">×</button><div id="modal-content"></div></dialog><div class="toast" id="toast" role="status" hidden></div>
+</body></html>
