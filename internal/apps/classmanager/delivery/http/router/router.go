@@ -4,9 +4,9 @@ import (
 	"database/sql"
 
 	"github.com/TheAmirhosssein/class-manager/config"
-	"github.com/TheAmirhosssein/class-manager/internal/apps/school/delivery/http/handler"
-	"github.com/TheAmirhosssein/class-manager/internal/apps/school/repository"
-	"github.com/TheAmirhosssein/class-manager/internal/apps/school/usecase"
+	"github.com/TheAmirhosssein/class-manager/internal/apps/classmanager/delivery/http/handler"
+	"github.com/TheAmirhosssein/class-manager/internal/apps/classmanager/repository"
+	"github.com/TheAmirhosssein/class-manager/internal/apps/classmanager/usecase"
 	"github.com/TheAmirhosssein/class-manager/internal/httpconfig/middleware"
 	"github.com/TheAmirhosssein/class-manager/internal/infrastructure/jwt"
 	"github.com/gin-gonic/gin"

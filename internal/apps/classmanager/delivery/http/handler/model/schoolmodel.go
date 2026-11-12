@@ -3,7 +3,7 @@ package model
 import (
 	"strconv"
 
-	"github.com/TheAmirhosssein/class-manager/internal/apps/school/entity"
+	"github.com/TheAmirhosssein/class-manager/internal/apps/classmanager/entity"
 )
 
 type SchoolJSON struct {

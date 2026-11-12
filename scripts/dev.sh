@@ -70,7 +70,6 @@ cat <<EOF
   Backend:  ${API_ORIGIN}          (Go API + embedded static)
   Frontend: http://127.0.0.1:${FRONTEND_PORT}  (UI; /api proxied to backend)
 
-  Set demo: false in frontend/assets/config.js for live login.
   Press Ctrl+C to stop both.
 
 EOF

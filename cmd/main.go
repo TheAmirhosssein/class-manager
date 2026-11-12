@@ -13,7 +13,7 @@ import (
 
 	"github.com/TheAmirhosssein/class-manager/config"
 	accountsrouter "github.com/TheAmirhosssein/class-manager/internal/apps/accounts/delivery/http/router"
-	schoolrouter "github.com/TheAmirhosssein/class-manager/internal/apps/school/delivery/http/router"
+	classmanagerrouter "github.com/TheAmirhosssein/class-manager/internal/apps/classmanager/delivery/http/router"
 	"github.com/TheAmirhosssein/class-manager/internal/infrastructure/database"
 	"github.com/TheAmirhosssein/class-manager/internal/infrastructure/jwt"
 	"github.com/TheAmirhosssein/class-manager/internal/infrastructure/server"
@@ -64,7 +64,7 @@ func serveCmd() *cobra.Command {
 			engine.Use(gin.Recovery())
 			server.RegisterHealth(engine, db)
 			accountsrouter.Register(engine, cfg, db, tokens)
-			schoolrouter.Register(engine, cfg, db, tokens)
+			classmanagerrouter.Register(engine, cfg, db, tokens)
 			server.RegisterFrontend(engine, cfg.Frontend.Dir)
 
 			srv := &http.Server{
@@ -122,7 +122,7 @@ func migrateCmd() *cobra.Command {
 func seedCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "seed",
-		Short: "Insert demo teacher, admin, and sample school",
+		Short: "Insert development teacher, admin, and sample school",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			cfg := config.GetConfig()
 			db, err := database.Open(cfg.Database)

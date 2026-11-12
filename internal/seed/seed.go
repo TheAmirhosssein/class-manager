@@ -22,7 +22,7 @@ const (
 	AdminName     = "مدیر سامانه"
 )
 
-// Create inserts demo accounts when missing. Safe to run repeatedly.
+// Create inserts development fixtures when missing. Safe to run repeatedly.
 func Create(ctx context.Context, db *sql.DB) error {
 	h := hash.New()
 	userRepo := repository.NewUserRepository(db)

@@ -28,4 +28,4 @@ make build
 air                 # hot reload (requires github.com/air-verse/air)
 ```
 
-Panel preview without Go: `node frontend/serve.cjs` (port 4173).
+Optional static dev server with API proxy: `node frontend/serve.cjs` (port 4173).

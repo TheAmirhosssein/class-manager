@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/TheAmirhosssein/class-manager/internal/apps/school/entity"
+	"github.com/TheAmirhosssein/class-manager/internal/apps/classmanager/entity"
 	"github.com/TheAmirhosssein/class-manager/internal/infrastructure/database"
 	"github.com/TheAmirhosssein/class-manager/internal/types"
 	"github.com/TheAmirhosssein/class-manager/pkg/log"

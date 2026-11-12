@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/TheAmirhosssein/class-manager/internal/apps/school/delivery/http/handler/model"
-	"github.com/TheAmirhosssein/class-manager/internal/apps/school/params"
-	"github.com/TheAmirhosssein/class-manager/internal/apps/school/usecase"
+	"github.com/TheAmirhosssein/class-manager/internal/apps/classmanager/delivery/http/handler/model"
+	"github.com/TheAmirhosssein/class-manager/internal/apps/classmanager/params"
+	"github.com/TheAmirhosssein/class-manager/internal/apps/classmanager/usecase"
 	"github.com/TheAmirhosssein/class-manager/internal/httpconfig/middleware"
 	"github.com/TheAmirhosssein/class-manager/internal/types"
 	sharedmessages "github.com/TheAmirhosssein/class-manager/internal/utils/messages"
