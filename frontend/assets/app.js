@@ -364,7 +364,21 @@
   }
 
   function bindClassesTableActions() {
-    $$('[data-manage-students]').forEach((b) => (b.onclick = () => openClassStudents(classBy(b.dataset.manageStudents))));
+    $$('[data-manage-students]').forEach(
+      (b) =>
+        (b.onclick = () => {
+          const c = classBy(b.dataset.manageStudents);
+          if (!c) return;
+          studentsPageClassId = String(c.id);
+          studentsListPage = 1;
+          sessionStorage.setItem('classino.selectedClass', studentsPageClassId);
+          if (c.schoolId) {
+            API.setActiveSchool(c.schoolId);
+            sessionStorage.setItem('classino.schoolId', String(c.schoolId));
+          }
+          location.hash = 'panel/students';
+        })
+    );
     $$('[data-attend-class]').forEach(
       (b) =>
       (b.onclick = () => {
@@ -706,119 +720,6 @@
       fatherName: String(d.get('fatherName') || '').trim(),
       studentNumber: String(d.get('studentNumber') || '').trim(),
     };
-  }
-
-  async function refreshClassStudentCount(classId) {
-    classesPageCache = await fetchClassesForFilter(classesPageSchoolId);
-    classes = classesPageCache;
-    paintClassesTable();
-    return classBy(classId);
-  }
-
-  async function openClassStudents(classData) {
-    if (!classData?.id) return;
-    let roster = [];
-    const paintRoster = () => {
-      const host = $('#class-students-table');
-      if (!host) return;
-      host.innerHTML = roster.length
-        ? `<div class="table-wrap"><table><thead><tr><th>ردیف</th><th>نام و نام خانوادگی</th><th>کد ملی</th><th>نام پدر</th><th>شماره</th><th>عملیات</th></tr></thead><tbody>${roster
-          .map(
-            (s, i) =>
-              `<tr data-student-row="${esc(s.id)}"><td>${fa(i + 1)}</td><td>${esc(studentDisplayName(s))}</td><td>${s.nationalCode ? fa(s.nationalCode) : '—'}</td><td>${s.fatherName ? esc(s.fatherName) : '—'}</td><td>${s.studentNumber ? fa(s.studentNumber) : '—'}</td><td><div class="table-actions"><button type="button" class="btn btn-outline btn-small" data-edit-student="${esc(s.id)}">ویرایش</button><button type="button" class="danger-link" data-delete-student="${esc(s.id)}">حذف</button></div></td></tr>`
-          )
-          .join('')}</tbody></table></div>`
-        : '<p class="empty">هنوز دانش‌آموزی در این کلاس ثبت نشده است.</p>';
-      $$('[data-edit-student]', host).forEach((btn) => {
-        btn.onclick = () => {
-          const s = roster.find((x) => String(x.id) === btn.dataset.editStudent);
-          if (!s) return;
-          const editOp = showModal(
-            `<h2 id="modal-title">ویرایش دانش‌آموز</h2><form id="student-edit-form" class="form-stack">${studentFormFields(s)}<div class="quick-links"><button type="submit" class="btn btn-green">ذخیره</button><button type="button" class="btn btn-outline modal-close">انصراف</button></div></form>`
-          );
-          const form = $('#student-edit-form');
-          form.onsubmit = async (e) => {
-            e.preventDefault();
-            const body = readStudentBody(form);
-            if (!nationalCodeClientOk(body.nationalCode)) {
-              toast('کد ملی باید ۱۰ رقم باشد یا خالی بماند.');
-              return;
-            }
-            const submit = $('button[type="submit"]', form);
-            submit.disabled = true;
-            try {
-              await API.saveStudent({ ...body, id: s.id });
-              if (editOp !== currentModalOp) return;
-              closeModal();
-              roster = await API.students(classData.id);
-              paintRoster();
-              await refreshClassStudentCount(classData.id);
-              toast('دانش‌آموز به‌روز شد.');
-            } catch (err) {
-              toast(err.message);
-            } finally {
-              submit.disabled = false;
-            }
-          };
-          $$('.modal-close', form).forEach((b) => (b.onclick = closeModal));
-        };
-      });
-      $$('[data-delete-student]', host).forEach((btn) => {
-        btn.onclick = async () => {
-          const s = roster.find((x) => String(x.id) === btn.dataset.deleteStudent);
-          if (!s || !confirm(`«${studentDisplayName(s)}» از این کلاس حذف شود؟`)) return;
-          btn.disabled = true;
-          try {
-            await API.deleteStudent(s.id);
-            roster = await API.students(classData.id);
-            paintRoster();
-            await refreshClassStudentCount(classData.id);
-            toast('دانش‌آموز حذف شد.');
-          } catch (err) {
-            toast(err.message);
-            btn.disabled = false;
-          }
-        };
-      });
-    };
-    const op = showModal(
-      `<h2 id="modal-title">دانش‌آموزان — ${esc(classData.title)}</h2><p class="help">پایه ${fa(classData.grade)}${classData.room ? ` • ${esc(classData.room)}` : ''}</p><div id="class-students-table"></div><h3>افزودن دانش‌آموز</h3><form id="student-create-form" class="form-stack">${studentFormFields()}<div class="quick-links"><button type="submit" class="btn btn-green">ثبت دانش‌آموز</button><button type="button" class="btn btn-outline modal-close">بستن</button></div></form>`
-    );
-    try {
-      roster = await API.students(classData.id);
-      if (op !== currentModalOp) return;
-      paintRoster();
-    } catch (e) {
-      if (op === currentModalOp) {
-        $('#class-students-table').innerHTML = error(e);
-      }
-      return;
-    }
-    const createForm = $('#student-create-form');
-    createForm.onsubmit = async (e) => {
-      e.preventDefault();
-      const body = readStudentBody(createForm);
-      if (!nationalCodeClientOk(body.nationalCode)) {
-        toast('کد ملی باید ۱۰ رقم باشد یا خالی بماند.');
-        return;
-      }
-      const btn = $('button[type="submit"]', createForm);
-      btn.disabled = true;
-      try {
-        await API.createStudent(body, classData.id);
-        if (op !== currentModalOp) return;
-        createForm.reset();
-        roster = await API.students(classData.id);
-        paintRoster();
-        await refreshClassStudentCount(classData.id);
-        toast('دانش‌آموز ثبت شد.');
-      } catch (err) {
-        toast(err.message);
-      } finally {
-        btn.disabled = false;
-      }
-    };
-    $$('.modal-close', createForm).forEach((b) => (b.onclick = closeModal));
   }
 
   function openClassCreateModal() {
