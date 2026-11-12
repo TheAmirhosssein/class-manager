@@ -4,9 +4,37 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = __dirname;
+const projectRoot = path.join(root, '..');
+
+function loadDotEnv(envPath) {
+  if (!fs.existsSync(envPath)) return;
+  const text = fs.readFileSync(envPath, 'utf8');
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    if (!key || process.env[key] !== undefined) continue;
+    let val = trimmed.slice(eq + 1).trim();
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1);
+    }
+    process.env[key] = val;
+  }
+}
+
+loadDotEnv(path.join(projectRoot, '.env'));
+
 const host = process.env.FRONTEND_HOST || '127.0.0.1';
 const port = parseInt(process.env.FRONTEND_PORT || '4173', 10);
-const proxyTarget = process.env.API_PROXY_TARGET || '';
+const httpHost = process.env.HTTP_HOST || '127.0.0.1';
+const httpPort = process.env.HTTP_PORT || '8080';
+const proxyTarget =
+  process.env.API_PROXY_TARGET || `http://${httpHost}:${httpPort}`;
 
 const types = {
   '.html': 'text/html; charset=utf-8',

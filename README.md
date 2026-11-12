@@ -23,9 +23,11 @@ data/                SQLite file (gitignored)
 ```sh
 go mod tidy
 make migrate
-make serve          # http://127.0.0.1:8080 — UI + /healthz
+make serve          # go run — UI + API on HTTP_PORT
+make prod           # build bin/classino, GIN_MODE=release, root .env
+make dev            # air/go + frontend proxy (scripts/dev.sh, root .env)
 make build
 air                 # hot reload (requires github.com/air-verse/air)
 ```
 
-Optional static dev server with API proxy: `node frontend/serve.cjs` (port 4173).
+Copy `.env.example` → `.env` and set `JWT_SECRET`. Both `make dev` and `make prod` source project-root `.env`; the frontend preview (`frontend/serve.cjs`) also loads that file when run alone.

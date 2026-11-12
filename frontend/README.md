@@ -12,7 +12,7 @@ go run ./cmd/main.go serve
 
 → `http://127.0.0.1:8080` (همان origin برای UI و `/api/v1`)
 
-برای توسعه با پروکسی جدا: `make dev` یا `scripts/dev.sh`.
+برای توسعه با پروکسی جدا: `make dev` یا `scripts/dev.sh`. برای اجرای نزدیک production (یک باینری، UI از Go): `make prod`.
 
 ## فایل‌ها
 
