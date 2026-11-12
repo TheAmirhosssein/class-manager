@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS classes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     school_id INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
-    grade TEXT NOT NULL CHECK (grade IN ('10', '11', '12')),
+    grade TEXT NOT NULL CHECK (grade IN ('7', '8', '9', '10', '11', '12')),
     room TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))

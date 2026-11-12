@@ -35,7 +35,7 @@
   const classBy = (id) => classes.find((x) => String(x.id) === String(id));
   const classOptions = () => classes.map((x) => `<option value="${esc(x.id)}">${esc(x.title)}</option>`).join('');
   const gradeOptions = (selected = '') =>
-    ['10', '11', '12']
+    ['7', '8', '9', '10', '11', '12']
       .map((g) => `<option value="${g}" ${String(selected) === g ? 'selected' : ''}>پایه ${fa(g)}</option>`)
       .join('');
   const noClassesNotice = () =>
@@ -425,7 +425,7 @@
   }
 
   function classFormFields(c = {}) {
-    return `<label>عنوان کلاس<input name="title" value="${esc(c.title || '')}" minlength="2" maxlength="100" required placeholder="مثلاً ریاضی ۳"></label><label>پایه<select name="grade" required>${gradeOptions(c.grade || '10')}</select></label><label>کلاس / اتاق<input name="room" value="${esc(c.room || '')}" maxlength="80" placeholder="مثلاً کلاس ۱۰۲"></label>`;
+    return `<label>عنوان کلاس<input name="title" value="${esc(c.title || '')}" minlength="2" maxlength="100" required placeholder="مثلاً ریاضی ۳"></label><label>پایه<select name="grade" required>${gradeOptions(c.grade || '7')}</select></label><label>کلاس / اتاق<input name="room" value="${esc(c.room || '')}" maxlength="80" placeholder="مثلاً کلاس ۱۰۲"></label>`;
   }
 
   function bindClassForm(form, onSuccess) {

@@ -3,6 +3,9 @@ package validation
 import "strings"
 
 var validGrades = map[string]struct{}{
+	"7":  {},
+	"8":  {},
+	"9":  {},
 	"10": {},
 	"11": {},
 	"12": {},
