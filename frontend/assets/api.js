@@ -71,7 +71,17 @@
     },
     saveSchool: (body) =>
       request('/school' + schoolQ(), { method: 'PATCH', body: { ...body, id: activeSchoolId || body.id } }),
-    classes: () => Promise.resolve([]),
+    classes: (schoolId) =>
+      request('/classes' + (schoolId ? '?schoolId=' + enc(String(schoolId)) : '')),
+    class: (classId) => request('/class?classId=' + enc(classId)),
+    createClass: (body, schoolId) =>
+      request('/class' + (schoolId ? '?schoolId=' + enc(String(schoolId)) : ''), { method: 'POST', body }),
+    saveClass: (body) =>
+      request('/class?classId=' + enc(body.id || ''), {
+        method: 'PATCH',
+        body: { title: body.title, grade: body.grade, room: body.room || '', id: body.id },
+      }),
+    deleteClass: (classId) => request('/class?classId=' + enc(classId), { method: 'DELETE', body: {} }),
     schedule: () => Promise.resolve([]),
     courses: () => Promise.resolve([]),
     students: () => Promise.resolve([]),

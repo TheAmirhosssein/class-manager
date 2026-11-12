@@ -29,3 +29,35 @@ type ReadSchoolParams struct {
 type ListSchoolsParams struct {
 	Actor OwnerActor
 }
+
+type CreateClassParams struct {
+	Actor    OwnerActor
+	SchoolID types.ID
+	Title    string
+	Grade    string
+	Room     string
+}
+
+type UpdateClassParams struct {
+	Actor    OwnerActor
+	ClassID  types.ID
+	SchoolID types.ID
+	Title    string
+	Grade    string
+	Room     string
+}
+
+type ReadClassParams struct {
+	Actor   OwnerActor
+	ClassID types.ID
+}
+
+type ListClassesParams struct {
+	Actor    OwnerActor
+	SchoolID types.ID
+}
+
+type DeleteClassParams struct {
+	Actor   OwnerActor
+	ClassID types.ID
+}
