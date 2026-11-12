@@ -75,8 +75,19 @@ func (u *SchoolUsecase) Create(ctx context.Context, p params.CreateSchoolParams)
 	if !validation.ValidSchoolName(name) {
 		return entity.School{}, message.InvalidInput
 	}
+	taken, err := u.schools.NameExistsForOwner(ctx, p.Actor.UserID, name, 0)
+	if err != nil {
+		log.Printf("school create name check: %v", err)
+		return entity.School{}, messages.SharedServerError()
+	}
+	if taken {
+		return entity.School{}, message.NameTaken
+	}
 	school, err := u.schools.Create(ctx, p.Actor.UserID, name)
 	if err != nil {
+		if database.IsUniqueViolation(err) {
+			return entity.School{}, message.NameTaken
+		}
 		log.Printf("school create usecase: %v", err)
 		return entity.School{}, messages.SharedServerError()
 	}
@@ -112,10 +123,21 @@ func (u *SchoolUsecase) UpdateName(ctx context.Context, p params.UpdateSchoolPar
 			return entity.School{}, message.Forbidden
 		}
 	}
+	taken, err := u.schools.NameExistsForOwner(ctx, p.Actor.UserID, name, schoolID)
+	if err != nil {
+		log.Printf("school update name check: %v", err)
+		return entity.School{}, messages.SharedServerError()
+	}
+	if taken {
+		return entity.School{}, message.NameTaken
+	}
 	updated, err := u.schools.UpdateName(ctx, schoolID, p.Actor.UserID, name)
 	if err != nil {
 		if database.IsNoRows(err) || err == sql.ErrNoRows {
 			return entity.School{}, message.Forbidden
+		}
+		if database.IsUniqueViolation(err) {
+			return entity.School{}, message.NameTaken
 		}
 		log.Printf("school update usecase: %v", err)
 		return entity.School{}, messages.SharedServerError()

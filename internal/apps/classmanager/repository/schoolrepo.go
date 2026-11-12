@@ -17,6 +17,7 @@ type SchoolRepository interface {
 	ReadFirstForOwner(ctx context.Context, ownerUserID types.ID) (entity.School, error)
 	ListForOwner(ctx context.Context, ownerUserID types.ID) ([]entity.School, error)
 	UpdateName(ctx context.Context, schoolID, ownerUserID types.ID, name string) (entity.School, error)
+	NameExistsForOwner(ctx context.Context, ownerUserID types.ID, name string, excludeSchoolID types.ID) (bool, error)
 }
 
 type schoolRepo struct {
@@ -95,6 +96,25 @@ func (r *schoolRepo) UpdateName(ctx context.Context, schoolID, ownerUserID types
 		return entity.School{}, sql.ErrNoRows
 	}
 	return entity.School{ID: schoolID, Name: name, OwnerUserID: ownerUserID}, nil
+}
+
+func (r *schoolRepo) NameExistsForOwner(ctx context.Context, ownerUserID types.ID, name string, excludeSchoolID types.ID) (bool, error) {
+	q := `SELECT 1 FROM schools WHERE owner_user_id = ? AND name = ?`
+	args := []any{ownerUserID, name}
+	if excludeSchoolID.Valid() {
+		q += ` AND id <> ?`
+		args = append(args, excludeSchoolID)
+	}
+	q += ` LIMIT 1`
+	var n int
+	err := r.db.QueryRowContext(ctx, q, args...).Scan(&n)
+	if database.IsNoRows(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (r *schoolRepo) scanSchool(row *sql.Row) (entity.School, error) {
