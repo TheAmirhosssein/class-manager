@@ -1,4 +1,4 @@
-.PHONY: build run serve migrate migrate-down test tidy air
+.PHONY: build run serve dev migrate migrate-down test tidy air
 
 BINARY := bin/classino
 GO_FILES := $(shell find . -name '*.go' -not -path './vendor/*')
@@ -11,6 +11,10 @@ run: build
 
 serve:
 	go run ./cmd serve
+
+# Backend (air if installed) + frontend preview with /api proxy — see scripts/dev.sh
+dev:
+	@bash scripts/dev.sh
 
 migrate:
 	go run ./cmd migrate
