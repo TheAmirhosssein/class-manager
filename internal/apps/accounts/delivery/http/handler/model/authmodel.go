@@ -8,15 +8,15 @@ import (
 )
 
 type LoginModel struct {
-	Email    string `json:"email" binding:"required"`
+	Mobile   string `json:"mobile" binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
 
 type UserJSON struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Role  string `json:"role"`
-	Email string `json:"email,omitempty"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Role   string `json:"role"`
+	Mobile string `json:"mobile,omitempty"`
 }
 
 type LoginResponse struct {
@@ -30,9 +30,9 @@ type SessionResponse struct {
 
 func NewUserJSON(u entity.User) UserJSON {
 	return UserJSON{
-		ID:    strconv.FormatInt(int64(u.ID), 10),
-		Name:  u.Name,
-		Role:  string(enum.RoleTeacher),
-		Email: u.Email,
+		ID:     strconv.FormatInt(int64(u.ID), 10),
+		Name:   u.Name,
+		Role:   string(enum.RoleTeacher),
+		Mobile: u.Mobile,
 	}
 }

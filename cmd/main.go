@@ -137,8 +137,8 @@ func seedCmd() *cobra.Command {
 			}
 
 			fmt.Println("Seed data ready.")
-			fmt.Printf("  Teacher login: %s / %s\n", seed.TeacherEmail, seed.TeacherPassword)
-			fmt.Printf("  Admin login:   %s / %s (API only for now)\n", seed.AdminEmail, seed.AdminPassword)
+			fmt.Printf("  Teacher login: %s / %s\n", seed.TeacherMobile, seed.TeacherPassword)
+			fmt.Printf("  Admin login:   %s / %s (API only for now)\n", seed.AdminMobile, seed.AdminPassword)
 			return nil
 		},
 	}

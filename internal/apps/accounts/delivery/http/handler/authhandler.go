@@ -31,7 +31,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		c.JSON(sharedmessages.BadRequest.HttpCode(), gin.H{"message": sharedmessages.BadRequest.Description})
 		return
 	}
-	result, msg := h.auth.LoginTeacher(c.Request.Context(), body.Email, body.Password)
+	result, msg := h.auth.LoginTeacher(c.Request.Context(), body.Mobile, body.Password)
 	if msg.Error != nil {
 		c.JSON(msg.HttpCode(), gin.H{"message": msg.Description})
 		return

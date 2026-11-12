@@ -50,16 +50,16 @@ func (u *UserUsecase) CreateByAdmin(ctx context.Context, p params.CreateUserUsec
 	if !actor.ID.Valid() {
 		return entity.User{}, message.AdminNotFound
 	}
-	if !validation.ValidEmail(p.Email) || !validation.ValidUserName(p.Name) || !validation.ValidPassword(p.Password) {
+	if !validation.ValidMobile(p.Mobile) || !validation.ValidUserName(p.Name) || !validation.ValidPassword(p.Password) {
 		return entity.User{}, message.UserInvalidInput
 	}
-	exists, err := u.users.ExistByEmail(ctx, p.Email)
+	exists, err := u.users.ExistByMobile(ctx, p.Mobile)
 	if err != nil {
 		log.Printf("user create exist check: %v", err)
 		return entity.User{}, messages.SharedServerError()
 	}
 	if exists {
-		return entity.User{}, message.UserEmailExists
+		return entity.User{}, message.UserMobileExists
 	}
 	hashVal, err := u.hash.Encrypt(p.Password)
 	if err != nil {
@@ -67,7 +67,7 @@ func (u *UserUsecase) CreateByAdmin(ctx context.Context, p params.CreateUserUsec
 		return entity.User{}, messages.SharedServerError()
 	}
 	in := entity.User{
-		Email:        strings.TrimSpace(p.Email),
+		Mobile:       validation.NormalizeMobile(p.Mobile),
 		PasswordHash: hashVal,
 		Name:         strings.TrimSpace(p.Name),
 		Role:         enum.RoleTeacher,

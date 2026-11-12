@@ -37,16 +37,16 @@ func (u *AdminUsecase) ReadByID(ctx context.Context, id types.ID) (entity.Admin,
 }
 
 func (u *AdminUsecase) Create(ctx context.Context, p params.CreateAdminParams) (entity.Admin, messages.Message) {
-	if !validation.ValidEmail(p.Email) || !validation.ValidUserName(p.Name) || !validation.ValidPassword(p.Password) {
+	if !validation.ValidMobile(p.Mobile) || !validation.ValidUserName(p.Name) || !validation.ValidPassword(p.Password) {
 		return entity.Admin{}, message.AdminInvalidInput
 	}
-	exists, err := u.admins.ExistByEmail(ctx, p.Email)
+	exists, err := u.admins.ExistByMobile(ctx, p.Mobile)
 	if err != nil {
 		log.Printf("admin create exist check: %v", err)
 		return entity.Admin{}, messages.SharedServerError()
 	}
 	if exists {
-		return entity.Admin{}, message.AdminEmailExists
+		return entity.Admin{}, message.AdminMobileExists
 	}
 	hashVal, err := u.hash.Encrypt(p.Password)
 	if err != nil {
@@ -54,7 +54,7 @@ func (u *AdminUsecase) Create(ctx context.Context, p params.CreateAdminParams) (
 		return entity.Admin{}, messages.SharedServerError()
 	}
 	in := entity.Admin{
-		Email:        strings.TrimSpace(p.Email),
+		Mobile:       validation.NormalizeMobile(p.Mobile),
 		PasswordHash: hashVal,
 		Name:         strings.TrimSpace(p.Name),
 	}
@@ -67,10 +67,10 @@ func (u *AdminUsecase) Create(ctx context.Context, p params.CreateAdminParams) (
 }
 
 func (u *AdminUsecase) Login(ctx context.Context, p params.LoginAdminParams) (entity.Admin, messages.Message) {
-	if !validation.ValidEmail(p.Email) || !validation.ValidPassword(p.Password) {
+	if !validation.ValidMobile(p.Mobile) || !validation.ValidPassword(p.Password) {
 		return entity.Admin{}, message.AdminInvalidPassword
 	}
-	admin, err := u.admins.ReadByEmail(ctx, strings.TrimSpace(p.Email))
+	admin, err := u.admins.ReadByMobile(ctx, p.Mobile)
 	if err != nil {
 		log.Printf("admin login read: %v", err)
 		return entity.Admin{}, messages.SharedServerError()

@@ -2,6 +2,7 @@ package validation
 
 import (
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -11,14 +12,27 @@ const (
 	maxNameLen     = 120
 )
 
-func ValidEmail(email string) bool {
-	email = strings.TrimSpace(email)
-	at := strings.LastIndex(email, "@")
-	if at < 1 || at == len(email)-1 {
-		return false
+func NormalizeMobile(raw string) string {
+	raw = strings.TrimSpace(raw)
+	var b strings.Builder
+	for _, r := range raw {
+		if unicode.IsDigit(r) {
+			b.WriteRune(r)
+		}
 	}
-	domain := email[at+1:]
-	return strings.Contains(domain, ".")
+	s := b.String()
+	if strings.HasPrefix(s, "98") && len(s) == 12 {
+		return "0" + s[2:]
+	}
+	if strings.HasPrefix(s, "9") && len(s) == 10 {
+		return "0" + s
+	}
+	return s
+}
+
+func ValidMobile(mobile string) bool {
+	m := NormalizeMobile(mobile)
+	return len(m) == 11 && strings.HasPrefix(m, "09")
 }
 
 func ValidUserName(name string) bool {

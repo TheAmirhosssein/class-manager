@@ -23,7 +23,7 @@ var (
 type Claims struct {
 	Kind  string `json:"kind"`
 	Role  string `json:"role"`
-	Email string `json:"email"`
+	Mobile string `json:"mobile"`
 	Name  string `json:"name"`
 	jwt.RegisteredClaims
 }
@@ -32,7 +32,7 @@ type IssueParams struct {
 	SubjectID types.ID
 	Kind      string
 	Role      string
-	Email     string
+	Mobile    string
 	Name      string
 }
 
@@ -64,7 +64,7 @@ func (s *Service) Issue(p IssueParams) (string, error) {
 	claims := Claims{
 		Kind:  p.Kind,
 		Role:  p.Role,
-		Email: p.Email,
+		Mobile: p.Mobile,
 		Name:  p.Name,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   strconv.FormatInt(int64(p.SubjectID), 10),

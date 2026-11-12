@@ -3,7 +3,7 @@ package params
 import "github.com/TheAmirhosssein/class-manager/internal/types"
 
 type CreateUserParams struct {
-	Email    string
+	Mobile   string
 	Password string
 	Name     string
 }

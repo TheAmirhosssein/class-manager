@@ -12,11 +12,11 @@ import (
 )
 
 const (
-	TeacherEmail    = "teacher@classino.local"
-	TeacherPassword = "Teacher123"
+	TeacherMobile   = "09001110011"
+	TeacherPassword = "strong-password"
 	TeacherName     = "مدرس نمونه"
 
-	AdminEmail    = "admin@classino.local"
+	AdminMobile   = "09120000002"
 	AdminPassword = "Admin12345"
 	AdminName     = "مدیر سامانه"
 )
@@ -40,7 +40,7 @@ func Create(ctx context.Context, db *sql.DB) error {
 }
 
 func ensureTeacher(ctx context.Context, users repository.UserRepository, h hash.Hash) error {
-	exists, err := users.ExistByEmail(ctx, TeacherEmail)
+	exists, err := users.ExistByMobile(ctx, TeacherMobile)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func ensureTeacher(ctx context.Context, users repository.UserRepository, h hash.
 		return fmt.Errorf("hash teacher password: %w", err)
 	}
 	_, err = users.Create(ctx, entity.User{
-		Email:        TeacherEmail,
+		Mobile:       TeacherMobile,
 		PasswordHash: hashVal,
 		Name:         TeacherName,
 		Role:         enum.RoleTeacher,
@@ -61,7 +61,7 @@ func ensureTeacher(ctx context.Context, users repository.UserRepository, h hash.
 }
 
 func ensureAdmin(ctx context.Context, admins repository.AdminRepository, h hash.Hash) error {
-	exists, err := admins.ExistByEmail(ctx, AdminEmail)
+	exists, err := admins.ExistByMobile(ctx, AdminMobile)
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func ensureAdmin(ctx context.Context, admins repository.AdminRepository, h hash.
 		return fmt.Errorf("hash admin password: %w", err)
 	}
 	_, err = admins.Create(ctx, entity.Admin{
-		Email:        AdminEmail,
+		Mobile:       AdminMobile,
 		PasswordHash: hashVal,
 		Name:         AdminName,
 	})

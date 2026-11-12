@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"strconv"
-	"strings"
 
 	"github.com/TheAmirhosssein/class-manager/internal/apps/accounts/delivery/http/handler/model"
 	"github.com/TheAmirhosssein/class-manager/internal/apps/accounts/message"
@@ -32,11 +31,11 @@ type LoginResult struct {
 	Token string
 }
 
-func (a *AuthUsecase) LoginTeacher(ctx context.Context, email, password string) (LoginResult, messages.Message) {
-	if !validation.ValidEmail(email) || !validation.ValidPassword(password) {
+func (a *AuthUsecase) LoginTeacher(ctx context.Context, mobile, password string) (LoginResult, messages.Message) {
+	if !validation.ValidMobile(mobile) || !validation.ValidPassword(password) {
 		return LoginResult{}, message.UserInvalidPassword
 	}
-	user, err := a.users.ReadByEmail(ctx, strings.TrimSpace(email))
+	user, err := a.users.ReadByMobile(ctx, mobile)
 	if err != nil {
 		log.Printf("auth login read: %v", err)
 		return LoginResult{}, messages.SharedServerError()
@@ -51,7 +50,7 @@ func (a *AuthUsecase) LoginTeacher(ctx context.Context, email, password string) 
 		SubjectID: user.ID,
 		Kind:      jwt.SubjectKindUser,
 		Role:      string(user.Role),
-		Email:     user.Email,
+		Mobile:    user.Mobile,
 		Name:      user.Name,
 	})
 	if err != nil {
@@ -92,10 +91,10 @@ func (a *AuthUsecase) SessionFromClaims(ctx context.Context, claims jwt.Claims) 
 		return model.NewUserJSON(user), message.LoginSuccess
 	}
 	return model.UserJSON{
-		ID:    strconv.FormatInt(int64(id), 10),
-		Name:  claims.Name,
-		Role:  claims.Role,
-		Email: claims.Email,
+		ID:     strconv.FormatInt(int64(id), 10),
+		Name:   claims.Name,
+		Role:   claims.Role,
+		Mobile: claims.Mobile,
 	}, message.LoginSuccess
 }
 

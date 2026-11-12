@@ -1,12 +1,12 @@
 package params
 
 type CreateAdminParams struct {
-	Email    string
+	Mobile   string
 	Password string
 	Name     string
 }
 
 type LoginAdminParams struct {
-	Email    string
+	Mobile   string
 	Password string
 }

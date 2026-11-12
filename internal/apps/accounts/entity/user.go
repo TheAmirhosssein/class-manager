@@ -7,7 +7,7 @@ import (
 
 type User struct {
 	base.Entity
-	Email        string
+	Mobile       string
 	PasswordHash string
 	Name         string
 	Role         enum.UserRole
