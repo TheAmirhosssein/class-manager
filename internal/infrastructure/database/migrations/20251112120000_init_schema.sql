@@ -11,11 +11,20 @@ CREATE TABLE IF NOT EXISTS schools (
 
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    school_id INTEGER REFERENCES schools(id),
     email TEXT NOT NULL COLLATE NOCASE,
     password_hash TEXT NOT NULL,
     name TEXT NOT NULL CHECK (length(trim(name)) >= 2),
-    role TEXT NOT NULL CHECK (role IN ('teacher', 'admin', 'student')),
+    role TEXT NOT NULL DEFAULT 'teacher' CHECK (role = 'teacher'),
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    UNIQUE (email)
+);
+
+CREATE TABLE IF NOT EXISTS admins (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL COLLATE NOCASE,
+    password_hash TEXT NOT NULL,
+    name TEXT NOT NULL CHECK (length(trim(name)) >= 2),
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     UNIQUE (email)
@@ -81,7 +90,8 @@ CREATE TABLE IF NOT EXISTS discipline_records (
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_school_id ON users (school_id);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
+CREATE INDEX IF NOT EXISTS idx_admins_email ON admins (email);
 CREATE INDEX IF NOT EXISTS idx_classes_school_id ON classes (school_id);
 CREATE INDEX IF NOT EXISTS idx_students_class_id ON students (class_id);
 CREATE INDEX IF NOT EXISTS idx_schedule_school_day ON schedule_items (school_id, day);
@@ -96,6 +106,7 @@ DROP TABLE IF EXISTS attendance_sessions;
 DROP TABLE IF EXISTS schedule_items;
 DROP TABLE IF EXISTS students;
 DROP TABLE IF EXISTS classes;
+DROP TABLE IF EXISTS admins;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS schools;
 -- +goose StatementEnd
