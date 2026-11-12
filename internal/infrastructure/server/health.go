@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -33,6 +34,21 @@ func RegisterFrontend(engine *gin.Engine, frontendDir, adminEntryPath string) {
 	if info, err := os.Stat(assetsDir); err == nil && info.IsDir() {
 		engine.Static("/assets", assetsDir)
 	}
+	manifest := filepath.Join(frontendDir, "manifest.webmanifest")
+	if _, err := os.Stat(manifest); err == nil {
+		engine.GET("/manifest.webmanifest", func(c *gin.Context) {
+			c.Header("Content-Type", "application/manifest+json; charset=utf-8")
+			c.File(manifest)
+		})
+	}
+	swJS := filepath.Join(frontendDir, "sw.js")
+	if _, err := os.Stat(swJS); err == nil {
+		engine.GET("/sw.js", func(c *gin.Context) {
+			c.Header("Content-Type", "application/javascript; charset=utf-8")
+			c.Header("Cache-Control", "no-cache")
+			c.File(swJS)
+		})
+	}
 	index := filepath.Join(frontendDir, "index.html")
 	if adminEntryPath != "" {
 		entry := adminEntryPath
@@ -45,6 +61,11 @@ func RegisterFrontend(engine *gin.Engine, frontendDir, adminEntryPath string) {
 	})
 	engine.NoRoute(func(c *gin.Context) {
 		if c.Request.Method != http.MethodGet {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		p := c.Request.URL.Path
+		if p == "/manifest.webmanifest" || p == "/sw.js" || strings.HasPrefix(p, "/assets/") {
 			c.Status(http.StatusNotFound)
 			return
 		}

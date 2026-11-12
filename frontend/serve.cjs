@@ -43,6 +43,10 @@ const types = {
   '.svg': 'image/svg+xml',
   '.woff2': 'font/woff2',
   '.md': 'text/plain; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
 };
 
 function shouldProxy(pathname) {
@@ -87,9 +91,12 @@ function serveStatic(req, res, pathname) {
       res.writeHead(404);
       return res.end('Not found');
     }
+    const rel = path.relative(root, file);
+    const cache =
+      rel === 'sw.js' ? 'no-cache' : rel === 'manifest.webmanifest' ? 'no-cache' : 'no-store';
     res.writeHead(200, {
       'Content-Type': types[path.extname(file)] || 'application/octet-stream',
-      'Cache-Control': 'no-store',
+      'Cache-Control': cache,
     });
     res.end(body);
   });

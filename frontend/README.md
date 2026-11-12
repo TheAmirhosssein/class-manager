@@ -14,6 +14,10 @@ go run ./cmd/main.go serve
 
 برای توسعه با پروکسی جدا: `make dev` یا `scripts/dev.sh`. برای اجرای نزدیک production (یک باینری، UI از Go): `make prod`.
 
+## PWA
+
+اپلیکیشن وب پیش‌رونده (نصب روی موبایل/دسکتاپ): `manifest.webmanifest` و `sw.js` در ریشهٔ `frontend/`؛ ثبت در `assets/pwa-register.js`. API همیشه از شبکه می‌رود؛ فقط پوسته و فایل‌های استاتیک کش می‌شوند. پس از تغییر `sw.js`، ثابت `CACHE` داخل آن را افزایش دهید.
+
 ## فایل‌ها
 
 ```text
