@@ -77,7 +77,8 @@
     const id = host.id || '';
     const root = document.createElement('div');
     root.className = 'jalali-date-picker';
-    root.innerHTML = `<div class="jalali-picker-input-wrap"><input type="text" class="jalali-picker-display" readonly placeholder="انتخاب تاریخ" autocomplete="off" aria-haspopup="dialog"><button type="button" class="jalali-picker-toggle" aria-label="باز کردن تقویم">📅</button><input type="hidden" name="${name}" value="${initial}" ${required ? 'required' : ''}></div><div class="jalali-picker-popover" hidden role="dialog" aria-label="تقویم شمسی"><div class="jalali-picker-head"><button type="button" class="jalali-nav" data-nav="prev" aria-label="ماه قبل">‹</button><span class="jalali-picker-title"></span><button type="button" class="jalali-nav" data-nav="next" aria-label="ماه بعد">›</button></div><div class="jalali-picker-grid"></div></div>`;
+    root.innerHTML = `<div class="jalali-picker-input-wrap"><input type="text" class="jalali-picker-display" readonly placeholder="انتخاب تاریخ" autocomplete="off" aria-haspopup="dialog"><button type="button" class="jalali-picker-toggle" aria-label="باز کردن تقویم"><span data-icon="calendar" aria-hidden="true"></span></button><input type="hidden" name="${name}" value="${initial}" ${required ? 'required' : ''}></div><div class="jalali-picker-popover" hidden role="dialog" aria-label="تقویم شمسی"><div class="jalali-picker-head"><button type="button" class="jalali-nav" data-nav="prev" aria-label="ماه قبل"><span data-icon="chevron-right" aria-hidden="true"></span></button><span class="jalali-picker-title"></span><button type="button" class="jalali-nav" data-nav="next" aria-label="ماه بعد"><span data-icon="chevron-left" aria-hidden="true"></span></button></div><div class="jalali-picker-grid"></div></div>`;
+    if (typeof Icons !== 'undefined') Icons.mount(root);
     host.replaceWith(root);
     if (id) root.id = id;
     setValue(root, initial);

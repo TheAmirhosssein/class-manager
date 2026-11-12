@@ -57,6 +57,14 @@
   }
   const BRAND = 'کلاسینو';
   const MODULE_SOON = 'این بخش هنوز به API وصل نشده است.';
+  const ic = (name, cls = 'icon') => (typeof Icons !== 'undefined' ? Icons.svg(name, cls) : '');
+  const mountIcons = (root) => {
+    if (typeof Icons !== 'undefined') Icons.mount(root || document);
+  };
+  const panelLink = (href, text, cls = 'btn btn-green') =>
+    `<a href="${href}" class="${cls} btn-with-icon"><span>${text}</span>${ic('arrow-left', 'icon')}</a>`;
+  const searchFieldIcon = () => `<span data-icon="search" aria-hidden="true"></span>`;
+  const btnNew = (text) => `${ic('plus', 'icon')}<span>${text}</span>`;
   let classes = [],
     sessionsOverviewCount = 0,
     schools = [],
@@ -105,7 +113,7 @@
       .map((g) => `<option value="${g}" ${String(selected) === g ? 'selected' : ''}>پایه ${fa(g)}</option>`)
       .join('');
   const noClassesNotice = () =>
-    `<div class="notice">هنوز کلاسی ثبت نشده است.</div><p class="help">از بخش «کلاس‌ها» برای یکی از مدارس خود کلاس بسازید.</p><a href="#panel/classes" class="btn btn-green">مدیریت کلاس‌ها ←</a>`;
+    `<div class="notice">هنوز کلاسی ثبت نشده است.</div><p class="help">از بخش «کلاس‌ها» برای یکی از مدارس خود کلاس بسازید.</p>${panelLink('#panel/classes', 'مدیریت کلاس‌ها')}`;
   const dayOptions = () => days.map((x, i) => `<option value="${i}">${x}</option>`).join('');
   const error = (e) => `<div class="error-message" role="alert">${esc(e.message || 'خطایی رخ داد.')}</div>`;
   const moduleSoon = () => `<p class="help">${MODULE_SOON}</p>`;
@@ -152,6 +160,7 @@
   function showModal(html) {
     currentModalOp++;
     $('#modal-content').innerHTML = html;
+    upgradeJalaliFields($('#modal-content'));
     if (!$('#modal').open) $('#modal').showModal();
     return currentModalOp;
   }
@@ -455,6 +464,7 @@
   }
 
   function upgradeJalaliFields(root) {
+    mountIcons(root);
     if (typeof JalaliPicker !== 'undefined') JalaliPicker.upgradeAll(root);
   }
 
@@ -805,7 +815,8 @@
       if (headerUser) headerUser.hidden = true;
       if (btn) {
         btn.hidden = false;
-        btn.innerHTML = 'ورود <span aria-hidden="true">↗</span>';
+        btn.innerHTML = `ورود <span data-icon="log-in" data-icon-class="icon-trailing" aria-hidden="true"></span>`;
+        mountIcons(btn);
         btn.setAttribute('href', '#login');
       }
       if (sidebarName) sidebarName.textContent = '—';
@@ -869,6 +880,7 @@
     $('#login-heading').textContent = 'ورود به کلاسینو';
     $('#auth-status').textContent = '';
     $('#auth-form').reset();
+    mountIcons($('#login-view'));
   }
 
   async function submitAuth(e) {
@@ -974,12 +986,13 @@
 
   function renderOverview() {
     if (!school.id) {
-      $('#panel-body').innerHTML =
-        '<div class="notice">هنوز مدرسه‌ای نساخته‌اید. از بخش «نام مدرسه» یک مدرسه بسازید.</div><a href="#panel/settings" class="btn btn-green">ساخت مدرسه ←</a>';
+      $('#panel-body').innerHTML = `<div class="notice">هنوز مدرسه‌ای نساخته‌اید. از بخش «نام مدرسه» یک مدرسه بسازید.</div>${panelLink('#panel/settings', 'ساخت مدرسه')}`;
+      upgradeJalaliFields($('#panel-body'));
       return;
     }
     const total = classes.reduce((n, c) => n + c.studentCount, 0);
-    $('#panel-body').innerHTML = `<div class="stats"><div class="stat"><b>${fa(classes.length)}</b><span>کلاس آموزشی</span></div><div class="stat"><b>${fa(total)}</b><span>عضویت در کلاس‌ها</span></div><div class="stat"><b>${fa(sessionsOverviewCount)}</b><span>جلسه در برنامه هفتگی</span></div></div><div class="surface"><div class="eyebrow">سلام، ${esc(user.name)}</div><h2>یک روز تازه، یک فرصت برای یادگیری</h2><p>کلاس‌ها و برنامهٔ هفتگی مدرسهٔ «${esc(school.name)}» را از منوی کناری مدیریت کنید.</p><div class="quick-links"><a href="#panel/classes" class="btn btn-green">کلاس‌ها ←</a><a href="#panel/schedule" class="btn btn-outline">برنامه هفتگی</a></div></div>`;
+    $('#panel-body').innerHTML = `<div class="stats"><div class="stat"><b>${fa(classes.length)}</b><span>کلاس آموزشی</span></div><div class="stat"><b>${fa(total)}</b><span>عضویت در کلاس‌ها</span></div><div class="stat"><b>${fa(sessionsOverviewCount)}</b><span>جلسه در برنامه هفتگی</span></div></div><div class="surface"><div class="eyebrow">سلام، ${esc(user.name)}</div><h2>یک روز تازه، یک فرصت برای یادگیری</h2><p>کلاس‌ها و برنامهٔ هفتگی مدرسهٔ «${esc(school.name)}» را از منوی کناری مدیریت کنید.</p><div class="quick-links">${panelLink('#panel/classes', 'کلاس‌ها')}<a href="#panel/schedule" class="btn btn-outline btn-with-icon">${ic('calendar-days', 'icon')}<span>برنامه هفتگی</span></a></div></div>`;
+    upgradeJalaliFields($('#panel-body'));
   }
 
   function classFormFields(c = {}) {
@@ -1085,8 +1098,8 @@
       return;
     }
     if (!schools.length) {
-      body.innerHTML =
-        '<div class="notice">برای ثبت کلاس، ابتدا یک مدرسه بسازید.</div><a href="#panel/settings" class="btn btn-green">تنظیمات مدرسه ←</a>';
+      body.innerHTML = `<div class="notice">برای ثبت کلاس، ابتدا یک مدرسه بسازید.</div>${panelLink('#panel/settings', 'تنظیمات مدرسه')}`;
+      upgradeJalaliFields(body);
       return;
     }
     if (classesPageSchoolId && !schools.some((s) => String(s.id) === String(classesPageSchoolId))) {
@@ -1099,7 +1112,7 @@
       body.innerHTML = error(e);
       return;
     }
-    body.innerHTML = `<div class="surface classes-page"><div class="classes-toolbar"><div class="form-row classes-filters"><label>مدرسه<select id="class-filter-school">${schoolFilterOptions(classesPageSchoolId)}</select></label><label class="classes-search-wrap">جستجوی عنوان<div class="search classes-search"><span aria-hidden="true">⌕</span><input id="class-search" type="search" placeholder="نام کلاس…" value="${esc(classesSearch)}" autocomplete="off"></div></label></div><button type="button" class="btn btn-green" id="class-create-open">کلاس جدید +</button></div><div id="classes-table-host"></div><div id="classes-pagination" class="pagination"></div></div>`;
+    body.innerHTML = `<div class="surface classes-page"><div class="classes-toolbar"><div class="form-row classes-filters"><label>مدرسه<select id="class-filter-school">${schoolFilterOptions(classesPageSchoolId)}</select></label><label class="classes-search-wrap">جستجوی عنوان<div class="search classes-search">${searchFieldIcon()}<input id="class-search" type="search" placeholder="نام کلاس…" value="${esc(classesSearch)}" autocomplete="off"></div></label></div><button type="button" class="btn btn-green btn-with-icon" id="class-create-open">${btnNew('کلاس جدید')}</button></div><div id="classes-table-host"></div><div id="classes-pagination" class="pagination"></div></div>`;
     $('#class-filter-school').onchange = async () => {
       classesPageSchoolId = $('#class-filter-school').value;
       classesListPage = 1;
@@ -1117,6 +1130,7 @@
       paintClassesTable();
     };
     $('#class-create-open').onclick = openClassCreateModal;
+    upgradeJalaliFields(body);
     paintClassesTable();
   }
 
@@ -1138,14 +1152,14 @@
       return;
     }
     if (!schools.length) {
-      body.innerHTML =
-        '<div class="notice">برای ثبت دانش‌آموز، ابتدا یک مدرسه بسازید.</div><a href="#panel/settings" class="btn btn-green">تنظیمات مدرسه ←</a>';
+      body.innerHTML = `<div class="notice">برای ثبت دانش‌آموز، ابتدا یک مدرسه بسازید.</div>${panelLink('#panel/settings', 'تنظیمات مدرسه')}`;
+      upgradeJalaliFields(body);
       return;
     }
     const scopeSchoolId = studentsScopeSchoolId();
     if (!scopeSchoolId) {
-      body.innerHTML =
-        '<div class="notice">مدرسهٔ فعال مشخص نیست.</div><a href="#panel/settings" class="btn btn-green">انتخاب مدرسه ←</a>';
+      body.innerHTML = `<div class="notice">مدرسهٔ فعال مشخص نیست.</div>${panelLink('#panel/settings', 'انتخاب مدرسه')}`;
+      upgradeJalaliFields(body);
       return;
     }
     if (
@@ -1161,7 +1175,7 @@
       body.innerHTML = error(e);
       return;
     }
-    body.innerHTML = `<div class="surface classes-page"><div class="classes-toolbar"><div class="form-row classes-filters"><label>کلاس<select id="student-filter-class">${studentClassFilterOptions(studentsPageClassId)}</select></label><label class="classes-search-wrap">جستجوی نام<div class="search classes-search"><span aria-hidden="true">⌕</span><input id="student-search" type="search" placeholder="نام یا نام خانوادگی…" value="${esc(studentsSearch)}" autocomplete="off"></div></label></div><button type="button" class="btn btn-green" id="student-create-open">دانش‌آموز جدید +</button></div><div id="students-table-host"></div><div id="students-pagination" class="pagination"></div></div>`;
+    body.innerHTML = `<div class="surface classes-page"><div class="classes-toolbar"><div class="form-row classes-filters"><label>کلاس<select id="student-filter-class">${studentClassFilterOptions(studentsPageClassId)}</select></label><label class="classes-search-wrap">جستجوی نام<div class="search classes-search">${searchFieldIcon()}<input id="student-search" type="search" placeholder="نام یا نام خانوادگی…" value="${esc(studentsSearch)}" autocomplete="off"></div></label></div><button type="button" class="btn btn-green btn-with-icon" id="student-create-open">${btnNew('دانش‌آموز جدید')}</button></div><div id="students-table-host"></div><div id="students-pagination" class="pagination"></div></div>`;
     const reloadCache = async () => {
       const sid = studentsScopeSchoolId();
       studentsPageCache = await fetchStudentsForFilter(sid, studentsPageClassId);
@@ -1184,6 +1198,7 @@
       paintStudentsTable();
     };
     $('#student-create-open').onclick = openStudentCreateModal;
+    upgradeJalaliFields(body);
     paintStudentsTable();
   }
 
@@ -1198,25 +1213,28 @@
     const body = $('#panel-body');
     const sessionId = sessionStorage.getItem('classino.attendanceSessionId') || '';
     if (!school.id) {
-      body.innerHTML =
-        '<div class="notice">برای حضور و غیاب ابتدا مدرسه را تنظیم کنید.</div><a href="#panel/settings" class="btn btn-green">تنظیمات مدرسه ←</a>';
+      body.innerHTML = `<div class="notice">برای حضور و غیاب ابتدا مدرسه را تنظیم کنید.</div>${panelLink('#panel/settings', 'تنظیمات مدرسه')}`;
+      upgradeJalaliFields(body);
       return;
     }
     if (!sessionId) {
-      body.innerHTML = `<div class="notice">حضور و غیاب به جلسهٔ برنامه وصل است.</div><p class="help">از جدول «برنامه هفتگی» روی «حضور و غیاب» همان جلسه بزنید.</p><a href="#panel/schedule" class="btn btn-green">برنامه هفتگی ←</a>`;
+      body.innerHTML = `<div class="notice">حضور و غیاب به جلسهٔ برنامه وصل است.</div><p class="help">از جدول «برنامه هفتگی» روی «حضور و غیاب» همان جلسه بزنید.</p>${panelLink('#panel/schedule', 'برنامه هفتگی')}`;
+      upgradeJalaliFields(body);
       return;
     }
-    body.innerHTML = `<div class="surface attendance-page"><div id="attendance-header" class="help">در حال بارگذاری جلسه…</div><p class="help">با انتخاب هر وضعیت، بلافاصله ذخیره می‌شود.</p><div id="attendance-table-host"></div><div class="quick-links"><a href="#panel/schedule" class="btn btn-outline">بازگشت به برنامه</a></div></div>`;
+    body.innerHTML = `<div class="surface attendance-page"><div id="attendance-header" class="help">در حال بارگذاری جلسه…</div><p class="help">با انتخاب هر وضعیت، بلافاصله ذخیره می‌شود.</p><div id="attendance-table-host"></div><div class="quick-links">${panelLink('#panel/schedule', 'بازگشت به برنامه', 'btn btn-outline')}</div></div>`;
     let weeklySession = sessionsPageCache.find((s) => String(s.id) === String(sessionId));
     if (!weeklySession) {
       try {
         weeklySession = await API.weeklySession(sessionId);
       } catch (e) {
-        body.innerHTML = error(e) + '<a href="#panel/schedule" class="btn btn-green">برنامه هفتگی</a>';
+        body.innerHTML = error(e) + panelLink('#panel/schedule', 'برنامه هفتگی');
+        upgradeJalaliFields(body);
         return;
       }
     }
     if (version !== routeVersion) return;
+    upgradeJalaliFields(body);
     const classTitle =
       weeklySession.classTitle || classBy(weeklySession.classId)?.title || classes.find((c) => String(c.id) === String(weeklySession.classId))?.title || '';
     $('#attendance-header').innerHTML = `<strong>${esc(classTitle)}</strong> · ${esc(prettyDate(weeklySession.sessionDate))} · ${prettyTime(weeklySession.startTime)}–${prettyTime(weeklySession.endTime)}${weeklySession.subject ? ` · ${esc(weeklySession.subject)}` : ''}`;
@@ -1270,12 +1288,13 @@
 
   async function renderDiscipline(version) {
     if (!school.id) {
-      $('#panel-body').innerHTML =
-        '<div class="notice">برای ثبت انضباط ابتدا مدرسه را تنظیم کنید.</div><a href="#panel/settings" class="btn btn-green">تنظیمات مدرسه ←</a>';
+      $('#panel-body').innerHTML = `<div class="notice">برای ثبت انضباط ابتدا مدرسه را تنظیم کنید.</div>${panelLink('#panel/settings', 'تنظیمات مدرسه')}`;
+      upgradeJalaliFields($('#panel-body'));
       return;
     }
     if (!classes.length) {
       $('#panel-body').innerHTML = noClassesNotice();
+      upgradeJalaliFields($('#panel-body'));
       return;
     }
     let records;
@@ -1287,7 +1306,7 @@
     }
     if (version !== routeVersion) return;
     $('#panel-body').innerHTML = `<div class="surface"><h2>ثبت یادداشت انضباطی</h2><form id="discipline-form"><div class="form-row"><label>کلاس<select id="discipline-class" required>${classOptions()}</select></label><label>دانش‌آموز<select id="discipline-student" required></select></label><label>نوع یادداشت<select name="type"><option value="positive">تشویق</option><option value="attention">نیاز به پیگیری</option></select></label><label>تاریخ<span data-jalali-date="date" data-value="${today()}" data-required></span></label></div><label class="form-stack">شرح یادداشت<textarea name="note" rows="3" minlength="3" maxlength="1000" placeholder="برای مثال: مشارکت خوب در حل تمرین گروهی" required></textarea></label><div class="save-bar"><button class="btn btn-green" id="discipline-save" type="submit" disabled>ثبت یادداشت</button><span id="discipline-form-status" role="status"></span></div></form></div><div class="surface"><h2>یادداشت‌های ثبت‌شده</h2><div id="discipline-records"></div></div>`;
-    upgradeJalaliFields($('#discipline-form'));
+    upgradeJalaliFields($('#panel-body'));
     let studentLoad = 0;
     const loadStudents = async () => {
       const op = ++studentLoad;
@@ -1362,14 +1381,14 @@
       return;
     }
     if (!schools.length) {
-      body.innerHTML =
-        '<div class="notice">برای ثبت برنامه، ابتدا یک مدرسه بسازید.</div><a href="#panel/settings" class="btn btn-green">تنظیمات مدرسه ←</a>';
+      body.innerHTML = `<div class="notice">برای ثبت برنامه، ابتدا یک مدرسه بسازید.</div>${panelLink('#panel/settings', 'تنظیمات مدرسه')}`;
+      upgradeJalaliFields(body);
       return;
     }
     const scopeSchoolId = sessionsScopeSchoolId();
     if (!scopeSchoolId) {
-      body.innerHTML =
-        '<div class="notice">مدرسهٔ فعال مشخص نیست.</div><a href="#panel/settings" class="btn btn-green">انتخاب مدرسه ←</a>';
+      body.innerHTML = `<div class="notice">مدرسهٔ فعال مشخص نیست.</div>${panelLink('#panel/settings', 'انتخاب مدرسه')}`;
+      upgradeJalaliFields(body);
       return;
     }
     if (
@@ -1388,9 +1407,10 @@
     if (version !== routeVersion) return;
     if (!sessionsClassesCache.length) {
       body.innerHTML = noClassesNotice();
+      upgradeJalaliFields(body);
       return;
     }
-    body.innerHTML = `<div class="surface classes-page"><div class="classes-toolbar"><div class="form-row classes-filters"><label>کلاس<select id="session-filter-class">${sessionClassFilterOptions(sessionsPageClassId)}</select></label><label class="classes-search-wrap">جستجو<div class="search classes-search"><span aria-hidden="true">⌕</span><input id="session-search" type="search" placeholder="کلاس، موضوع یا تاریخ…" value="${esc(sessionsSearch)}" autocomplete="off"></div></label></div><button type="button" class="btn btn-green" id="session-create-open">جلسه جدید +</button></div><div id="sessions-table-host"></div><div id="sessions-pagination" class="pagination"></div></div>`;
+    body.innerHTML = `<div class="surface classes-page"><div class="classes-toolbar"><div class="form-row classes-filters"><label>کلاس<select id="session-filter-class">${sessionClassFilterOptions(sessionsPageClassId)}</select></label><label class="classes-search-wrap">جستجو<div class="search classes-search">${searchFieldIcon()}<input id="session-search" type="search" placeholder="کلاس، موضوع یا تاریخ…" value="${esc(sessionsSearch)}" autocomplete="off"></div></label></div><button type="button" class="btn btn-green btn-with-icon" id="session-create-open">${btnNew('جلسه جدید')}</button></div><div id="sessions-table-host"></div><div id="sessions-pagination" class="pagination"></div></div>`;
     const reloadCache = async () => {
       const sid = sessionsScopeSchoolId();
       sessionsPageCache = await fetchSessionsForFilter(sid, sessionsPageClassId);
@@ -1418,6 +1438,7 @@
       paintSessionsTable();
     };
     $('#session-create-open').onclick = openSessionCreateModal;
+    upgradeJalaliFields(body);
     paintSessionsTable();
   }
 
@@ -1494,6 +1515,7 @@
   $('#logout-button')?.addEventListener('click', logout);
 
   async function init() {
+    mountIcons(document);
     await refreshSession();
     if (isLoggedIn()) {
       try {
