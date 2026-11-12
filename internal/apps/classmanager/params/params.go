@@ -97,3 +97,41 @@ type DeleteStudentParams struct {
 	Actor     OwnerActor
 	StudentID types.ID
 }
+
+type ListSessionsParams struct {
+	Actor    OwnerActor
+	SchoolID types.ID
+	ClassID  types.ID
+}
+
+type ReadSessionParams struct {
+	Actor     OwnerActor
+	SessionID types.ID
+}
+
+type CreateSessionParams struct {
+	Actor       OwnerActor
+	SchoolID    types.ID
+	ClassID     types.ID
+	SessionDate string
+	Day         int
+	Start       string
+	End         string
+	Subject     string
+}
+
+type UpdateSessionParams struct {
+	Actor       OwnerActor
+	SessionID   types.ID
+	ClassID     types.ID
+	SessionDate string
+	Day         int
+	Start       string
+	End         string
+	Subject     string
+}
+
+type DeleteSessionParams struct {
+	Actor     OwnerActor
+	SessionID types.ID
+}

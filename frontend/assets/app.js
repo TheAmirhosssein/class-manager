@@ -6,21 +6,59 @@
     String(v ?? '').replace(/[&<>"']/g, (x) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[x]));
   const fa = (v) => String(v).replace(/\d/g, (x) => '۰۱۲۳۴۵۶۷۸۹'[x]);
   const days = ['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه'];
-  const today = () => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  };
+  const today = () => (typeof Jalali !== 'undefined' ? Jalali.tehranTodayIso() : new Date().toISOString().slice(0, 10));
+  const tehranDateFormatter = new Intl.DateTimeFormat('fa-IR', { dateStyle: 'medium', timeZone: 'Asia/Tehran' });
+  const tehranWeekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'Asia/Tehran' });
+  const tehranWeekdayMap = { Sat: 0, Sun: 1, Mon: 2, Tue: 3, Wed: 4, Thu: 5, Fri: 6 };
   const prettyDate = (v) => {
     try {
-      return new Intl.DateTimeFormat('fa-IR', { dateStyle: 'medium' }).format(new Date(v + 'T12:00:00'));
+      return tehranDateFormatter.format(new Date(String(v) + 'T12:00:00+03:30'));
     } catch {
       return v;
     }
   };
+  const tehranWeekday = (dateStr) => {
+    try {
+      const key = tehranWeekdayFormatter.format(new Date(String(dateStr) + 'T12:00:00+03:30'));
+      return tehranWeekdayMap[key] ?? 0;
+    } catch {
+      return 0;
+    }
+  };
+  const prettyTime = (v) => fa(String(v || '').slice(0, 5));
+  const CLOCK_HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+  const CLOCK_MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+
+  function parseClock(value) {
+    const v = normalizeDigits(String(value || '').trim());
+    const m = v.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return { h: '08', m: '00' };
+    const h = Number(m[1]);
+    const min = Number(m[2]);
+    if (h > 23 || min > 59) return { h: '08', m: '00' };
+    return { h: String(h).padStart(2, '0'), m: String(min).padStart(2, '0') };
+  }
+
+  function clockSelectPair(name, value) {
+    const { h, m } = parseClock(value);
+    const hourOpts = CLOCK_HOURS.map(
+      (x) => `<option value="${x}" ${x === h ? 'selected' : ''}>${fa(x)}</option>`
+    ).join('');
+    const minOpts = CLOCK_MINUTES.map(
+      (x) => `<option value="${x}" ${x === m ? 'selected' : ''}>${fa(x)}</option>`
+    ).join('');
+    return `<span class="clock-24" data-clock="${name}"><select name="${name}Hour" class="clock-hour" aria-label="ساعت" required>${hourOpts}</select><span class="clock-sep" aria-hidden="true">:</span><select name="${name}Minute" class="clock-minute" aria-label="دقیقه" required>${minOpts}</select></span>`;
+  }
+
+  function readClockFromForm(form, name) {
+    const h = form.querySelector(`[name="${name}Hour"]`)?.value;
+    const m = form.querySelector(`[name="${name}Minute"]`)?.value;
+    return `${h || '00'}:${m || '00'}`;
+  }
   const BRAND = 'کلاسینو';
   const MODULE_SOON = 'این بخش هنوز به API وصل نشده است.';
   let classes = [],
-    schedule = [],
+    sessionsOverviewCount = 0,
     schools = [],
     school = { id: '', name: '' },
     routeVersion = 0,
@@ -38,6 +76,12 @@
     studentsSearch = '',
     studentsListPage = 1;
   const STUDENTS_PAGE_SIZE = 10;
+  let sessionsPageClassId = '',
+    sessionsPageCache = [],
+    sessionsClassesCache = [],
+    sessionsSearch = '',
+    sessionsListPage = 1;
+  const SESSIONS_PAGE_SIZE = 10;
   const faStudentCollator = new Intl.Collator('fa', { sensitivity: 'base', numeric: true });
   const studentsScopeSchoolId = () => API.activeSchool() || school?.id || schools[0]?.id || '';
   const sortStudentsPersian = (list) =>
@@ -300,6 +344,253 @@
     $$('.modal-close', form).forEach((b) => (b.onclick = closeModal));
   }
 
+  const sessionsScopeSchoolId = () => API.activeSchool() || school?.id || schools[0]?.id || '';
+
+  const normalizeSessionRow = (s) => ({
+    ...s,
+    startTime: s.startTime || s.start || '',
+    endTime: s.endTime || s.end || '',
+  });
+
+  async function fetchSessionsForFilter(schoolId, classId) {
+    const sid = schoolId || sessionsScopeSchoolId();
+    sessionsClassesCache = await fetchClassesForFilter(schoolId);
+    if (!sessionsClassesCache.length) return [];
+    const byClass = Object.fromEntries(sessionsClassesCache.map((c) => [String(c.id), c]));
+    const enrich = (list) =>
+      list.map((raw) => {
+        const s = normalizeSessionRow(raw);
+        const c = byClass[String(s.classId)] || {};
+        return { ...s, classTitle: c.title || '', schoolName: c.schoolName || '' };
+      });
+    if (classId) {
+      return enrich(await API.sessions(sid, classId)).sort(
+        (a, b) =>
+          String(b.sessionDate).localeCompare(String(a.sessionDate)) || String(a.startTime).localeCompare(String(b.startTime))
+      );
+    }
+    return enrich(await API.sessions(sid, '')).sort(
+      (a, b) =>
+        String(b.sessionDate).localeCompare(String(a.sessionDate)) || String(a.startTime).localeCompare(String(b.startTime))
+    );
+  }
+
+  const sessionClassFilterOptions = (selectedClassId) =>
+    `<option value="" ${selectedClassId === '' || selectedClassId === undefined ? 'selected' : ''}>همه کلاس‌ها</option>${sessionsClassesCache
+      .map(
+        (c) =>
+          `<option value="${esc(c.id)}" ${String(c.id) === String(selectedClassId) ? 'selected' : ''}>${esc(c.title)}</option>`
+      )
+      .join('')}`;
+
+  function sessionFormFields(s = {}) {
+    const dateVal = s.sessionDate || today();
+    const dayVal = s.day !== undefined && s.day !== '' ? s.day : tehranWeekday(dateVal);
+    return `<label>کلاس<select name="classId" ${s.id ? 'disabled' : ''} required>${sessionClassFilterOptions(s.classId || sessionsPageClassId || '')}</select></label><label>تاریخ جلسه<span data-jalali-date="sessionDate" data-value="${esc(dateVal)}" data-required></span></label><label>روز هفته<select name="day">${days
+      .map((x, i) => `<option value="${i}" ${Number(dayVal) === i ? 'selected' : ''}>${x}</option>`)
+      .join('')}</select></label><label>از ساعت (۲۴ ساعته)${clockSelectPair('startTime', s.startTime || '08:00')}</label><label>تا ساعت (۲۴ ساعته)${clockSelectPair('endTime', s.endTime || '09:30')}</label><label>موضوع (اختیاری)<input name="subject" value="${esc(s.subject || '')}" maxlength="100" placeholder="مثلاً حل تمرین"></label>`;
+  }
+
+  function readSessionBody(form) {
+    const d = new FormData(form);
+    const sessionDate = String(d.get('sessionDate') || '').trim();
+    return {
+      sessionDate,
+      day: Number(d.get('day')),
+      startTime: readClockFromForm(form, 'startTime'),
+      endTime: readClockFromForm(form, 'endTime'),
+      subject: String(d.get('subject') || '').trim(),
+    };
+  }
+
+  function bindSessionDateDaySync(form) {
+    const daySelect = form.querySelector('[name="day"]');
+    const picker = form.querySelector('.jalali-date-picker');
+    if (!daySelect || !picker) return;
+    const sync = (iso) => {
+      if (iso) daySelect.value = String(tehranWeekday(iso));
+    };
+    picker.addEventListener('jalali-change', (e) => sync(e.detail?.iso));
+    sync(JalaliPicker.getIso(picker));
+  }
+
+  function upgradeJalaliFields(root) {
+    if (typeof JalaliPicker !== 'undefined') JalaliPicker.upgradeAll(root);
+  }
+
+  function filteredSessionsRows() {
+    const q = sessionsSearch.trim();
+    const rows = q
+      ? sessionsPageCache.filter((s) => {
+          const subj = s.subject || '';
+          return String(s.classTitle || '').includes(q) || subj.includes(q) || prettyDate(s.sessionDate).includes(q);
+        })
+      : sessionsPageCache;
+    return rows;
+  }
+
+  function paintSessionsTable() {
+    const host = $('#sessions-table-host');
+    const pager = $('#sessions-pagination');
+    if (!host || !pager) return;
+    const rows = filteredSessionsRows();
+    const total = rows.length;
+    const totalPages = Math.max(1, Math.ceil(total / SESSIONS_PAGE_SIZE));
+    if (sessionsListPage > totalPages) sessionsListPage = totalPages;
+    if (sessionsListPage < 1) sessionsListPage = 1;
+    const start = (sessionsListPage - 1) * SESSIONS_PAGE_SIZE;
+    const pageRows = rows.slice(start, start + SESSIONS_PAGE_SIZE);
+    host.innerHTML = pageRows.length
+      ? `<div class="table-wrap"><table class="classes-table sessions-table"><thead><tr><th>ردیف</th><th>کلاس</th><th>تاریخ</th><th>روز</th><th>ساعت</th><th>موضوع</th><th>عملیات</th></tr></thead><tbody>${pageRows
+          .map((s, i) => {
+            const subj = s.subject ? esc(s.subject) : '—';
+            return `<tr data-session-id="${esc(s.id)}"><td>${fa(start + i + 1)}</td><td>${esc(s.classTitle || '')}</td><td>${esc(prettyDate(s.sessionDate))}</td><td>${days[s.day] || '—'}</td><td><span title="Asia/Tehran">${prettyTime(s.startTime)} – ${prettyTime(s.endTime)}</span></td><td>${subj}</td><td><div class="table-actions"><button type="button" class="btn btn-outline btn-small" data-edit-session="${esc(s.id)}">ویرایش</button><button type="button" class="danger-link" data-delete-session="${esc(s.id)}">حذف</button></div></td></tr>`;
+          })
+          .join('')}</tbody></table></div>`
+      : `<p class="empty">${total ? 'نتیجه‌ای برای فیلترها یافت نشد.' : 'جلسه‌ای ثبت نشده است.'}</p>`;
+    pager.innerHTML =
+      total > 0
+        ? `<span class="page-meta">${fa(total)} جلسه • صفحه ${fa(sessionsListPage)} از ${fa(totalPages)}</span><button type="button" class="btn btn-outline btn-small" id="sessions-page-prev" ${sessionsListPage <= 1 ? 'disabled' : ''}>قبلی</button>${Array.from({ length: totalPages }, (_, i) => i + 1)
+            .filter((p) => p === 1 || p === totalPages || Math.abs(p - sessionsListPage) <= 1)
+            .reduce((acc, p, idx, arr) => {
+              if (idx && p - arr[idx - 1] > 1) acc.push('…');
+              acc.push(p);
+              return acc;
+            }, [])
+            .map((p) =>
+              typeof p === 'number'
+                ? `<button type="button" class="btn btn-outline btn-small sessions-page-num ${p === sessionsListPage ? 'active' : ''}" data-page="${p}">${fa(p)}</button>`
+                : `<span class="page-ellipsis">${p}</span>`
+            )
+            .join('')}<button type="button" class="btn btn-outline btn-small" id="sessions-page-next" ${sessionsListPage >= totalPages ? 'disabled' : ''}>بعدی</button>`
+        : '';
+    bindSessionsTableActions();
+    $('#sessions-page-prev')?.addEventListener('click', () => {
+      if (sessionsListPage > 1) {
+        sessionsListPage--;
+        paintSessionsTable();
+      }
+    });
+    $('#sessions-page-next')?.addEventListener('click', () => {
+      if (sessionsListPage < totalPages) {
+        sessionsListPage++;
+        paintSessionsTable();
+      }
+    });
+    $$('.sessions-page-num').forEach((b) =>
+      b.addEventListener('click', () => {
+        sessionsListPage = Number(b.dataset.page);
+        paintSessionsTable();
+      })
+    );
+  }
+
+  function bindSessionsTableActions() {
+    const reload = async () => {
+      const sid = sessionsScopeSchoolId();
+      sessionsPageCache = await fetchSessionsForFilter(sid, sessionsPageClassId);
+      $('#session-filter-class') && ($('#session-filter-class').innerHTML = sessionClassFilterOptions(sessionsPageClassId));
+      paintSessionsTable();
+    };
+    $$('[data-edit-session]').forEach((b) => {
+      b.onclick = () => openSessionEditor(sessionsPageCache.find((x) => String(x.id) === b.dataset.editSession), reload);
+    });
+    $$('[data-delete-session]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const item = sessionsPageCache.find((x) => String(x.id) === b.dataset.deleteSession);
+        if (!item || !confirm('این جلسه از برنامه حذف شود؟')) return;
+        b.disabled = true;
+        try {
+          await API.deleteSession(item.id);
+          sessionsPageCache = sessionsPageCache.filter((x) => String(x.id) !== String(item.id));
+          sessionsOverviewCount = Math.max(0, sessionsOverviewCount - 1);
+          paintSessionsTable();
+          toast('جلسه حذف شد.');
+        } catch (err) {
+          toast(err.message);
+          b.disabled = false;
+        }
+      })
+    );
+  }
+
+  function openSessionEditor(sessionData, onSuccess) {
+    if (!sessionData) return;
+    const op = showModal(
+      `<h2 id="modal-title">ویرایش جلسه</h2><form id="session-edit-form" class="form-stack">${sessionFormFields({ ...sessionData, classId: sessionData.classId })}<div class="quick-links"><button type="submit" class="btn btn-green">ذخیره</button><button type="button" class="btn btn-outline modal-close">انصراف</button></div></form>`
+    );
+    const form = $('#session-edit-form');
+    upgradeJalaliFields(form);
+    bindSessionDateDaySync(form);
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const body = readSessionBody(form);
+      if (body.startTime >= body.endTime) {
+        toast('ساعت پایان باید بعد از ساعت شروع باشد.');
+        return;
+      }
+      if (tehranWeekday(body.sessionDate) !== body.day) {
+        toast('روز هفته با تاریخ جلسه (تقویم تهران) هم‌خوان نیست.');
+        return;
+      }
+      const btn = $('button[type="submit"]', form);
+      btn.disabled = true;
+      try {
+        await API.saveSession({ ...body, id: sessionData.id });
+        if (op !== currentModalOp) return;
+        closeModal();
+        await onSuccess();
+        toast('جلسه به‌روز شد.');
+      } catch (err) {
+        toast(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+    $$('.modal-close', form).forEach((b) => (b.onclick = closeModal));
+  }
+
+  function openSessionCreateModal() {
+    const defaultClass = sessionsPageClassId || sessionsClassesCache[0]?.id || '';
+    const op = showModal(
+      `<h2 id="modal-title">جلسه جدید</h2><p>کلاس، تاریخ و بازهٔ زمانی جلسه را وارد کنید. زمان‌ها بر اساس منطقهٔ زمانی تهران هستند.</p><form id="session-create-form" class="form-stack">${sessionFormFields({ classId: defaultClass, sessionDate: today() })}<div class="quick-links"><button type="submit" class="btn btn-green">ثبت جلسه</button><button type="button" class="btn btn-outline modal-close">انصراف</button></div></form>`
+    );
+    const form = $('#session-create-form');
+    upgradeJalaliFields(form);
+    bindSessionDateDaySync(form);
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const classId = form.querySelector('[name="classId"]').value;
+      const body = readSessionBody(form);
+      if (body.startTime >= body.endTime) {
+        toast('ساعت پایان باید بعد از ساعت شروع باشد.');
+        return;
+      }
+      if (tehranWeekday(body.sessionDate) !== body.day) {
+        toast('روز هفته با تاریخ جلسه (تقویم تهران) هم‌خوان نیست.');
+        return;
+      }
+      const btn = $('button[type="submit"]', form);
+      btn.disabled = true;
+      try {
+        await API.createSession(body, classId);
+        if (op !== currentModalOp) return;
+        closeModal();
+        const sid = sessionsScopeSchoolId();
+        sessionsPageCache = await fetchSessionsForFilter(sid, sessionsPageClassId);
+        sessionsListPage = 1;
+        sessionsOverviewCount += 1;
+        paintSessionsTable();
+        toast('جلسه ثبت شد.');
+      } catch (err) {
+        toast(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+    $$('.modal-close', form).forEach((b) => (b.onclick = closeModal));
+  }
+
   function filteredClassesRows() {
     const q = classesSearch.trim();
     if (!q) return classesPageCache;
@@ -424,14 +715,18 @@
         }
       }
       classes = school?.id ? await API.classes(school.id) : [];
-      schedule = [];
+      try {
+        sessionsOverviewCount = school?.id ? (await API.sessions(school.id, '')).length : 0;
+      } catch {
+        sessionsOverviewCount = 0;
+      }
       return !!school?.id;
     } catch (e) {
       if (/مدرسه‌ای برای حساب|یافت نشد/i.test(e.message)) {
         school = { id: '', name: '' };
         schools = [];
         classes = [];
-        schedule = [];
+        sessionsOverviewCount = 0;
         API.setActiveSchool('');
         sessionStorage.removeItem('classino.schoolId');
         return false;
@@ -512,7 +807,7 @@
     school = { id: '', name: '' };
     schools = [];
     classes = [];
-    schedule = [];
+    sessionsOverviewCount = 0;
     classesPageSchoolId = '';
     classesPageCache = [];
     classesSearch = '';
@@ -569,7 +864,7 @@
       students: 'دانش‌آموزان',
       attendance: 'حضور و غیاب',
       discipline: 'انضباط',
-      schedule: 'برنامه کلاسی',
+      schedule: 'برنامه هفتگی',
       settings: 'تنظیمات مدرسه',
     };
     if (!titles[tab]) tab = 'overview';
@@ -645,7 +940,7 @@
       return;
     }
     const total = classes.reduce((n, c) => n + c.studentCount, 0);
-    $('#panel-body').innerHTML = `<div class="stats"><div class="stat"><b>${fa(classes.length)}</b><span>کلاس آموزشی</span></div><div class="stat"><b>${fa(total)}</b><span>عضویت در کلاس‌ها</span></div><div class="stat"><b>${fa(schedule.length)}</b><span>بازه در برنامه هفتگی</span></div></div><div class="surface"><div class="eyebrow">سلام، ${esc(user.name)}</div><h2>یک روز تازه، یک فرصت برای یادگیری</h2><p>کلاس‌های مدرسهٔ «${esc(school.name)}» را از بخش کلاس‌ها مدیریت کنید؛ حضور، برنامه و انضباط به‌زودی به API وصل می‌شوند.</p><div class="quick-links"><a href="#panel/classes" class="btn btn-green">کلاس‌ها ←</a><a href="#panel/settings" class="btn btn-outline">تنظیمات مدرسه</a></div></div>`;
+    $('#panel-body').innerHTML = `<div class="stats"><div class="stat"><b>${fa(classes.length)}</b><span>کلاس آموزشی</span></div><div class="stat"><b>${fa(total)}</b><span>عضویت در کلاس‌ها</span></div><div class="stat"><b>${fa(sessionsOverviewCount)}</b><span>جلسه در برنامه هفتگی</span></div></div><div class="surface"><div class="eyebrow">سلام، ${esc(user.name)}</div><h2>یک روز تازه، یک فرصت برای یادگیری</h2><p>کلاس‌ها و برنامهٔ هفتگی مدرسهٔ «${esc(school.name)}» را از منوی کناری مدیریت کنید.</p><div class="quick-links"><a href="#panel/classes" class="btn btn-green">کلاس‌ها ←</a><a href="#panel/schedule" class="btn btn-outline">برنامه هفتگی</a></div></div>`;
   }
 
   function classFormFields(c = {}) {
@@ -863,7 +1158,9 @@
       $('#panel-body').innerHTML = noClassesNotice();
       return;
     }
-    $('#panel-body').innerHTML = `<div class="form-row"><label>انتخاب کلاس<select id="attendance-class">${classOptions()}</select></label><label>تاریخ جلسه<input type="date" id="attendance-date" value="${today()}" required></label><button class="btn btn-outline" id="all-present">همه حاضر</button></div><div id="attendance-caption" class="help"></div><div id="attendance-table"></div><div class="save-bar"><button class="btn btn-green" id="attendance-save" disabled>ذخیره حضور و غیاب</button><span id="attendance-status" role="status">وضعیت را برای همه دانش‌آموزان مشخص کنید.</span></div>`;
+    $('#panel-body').innerHTML = `<div class="form-row"><label>انتخاب کلاس<select id="attendance-class">${classOptions()}</select></label><label>تاریخ جلسه<span id="attendance-date" data-jalali-date="sessionDate" data-value="${today()}" data-required></span></label><button class="btn btn-outline" id="all-present">همه حاضر</button></div><div id="attendance-caption" class="help"></div><div id="attendance-table"></div><div class="save-bar"><button class="btn btn-green" id="attendance-save" disabled>ذخیره حضور و غیاب</button><span id="attendance-status" role="status">وضعیت را برای همه دانش‌آموزان مشخص کنید.</span></div>`;
+    upgradeJalaliFields($('#panel-body'));
+    const attendanceDateIso = () => JalaliPicker.getIso($('#attendance-date'));
     $('#attendance-class').value = selectedClass();
     let loadId = 0,
       roster = [],
@@ -873,7 +1170,7 @@
     async function load() {
       const op = ++loadId,
         id = $('#attendance-class').value,
-        date = $('#attendance-date').value;
+        date = attendanceDateIso();
       $('#attendance-save').disabled = true;
       $('#attendance-table').innerHTML = '<p class="help">در حال دریافت فهرست…</p>';
       $('#attendance-status').textContent = '';
@@ -918,19 +1215,19 @@
       $('#attendance-status').textContent = 'تغییرات هنوز ذخیره نشده‌اند.';
     };
     let previousClass = $('#attendance-class').value,
-      previousDate = $('#attendance-date').value;
+      previousDate = attendanceDateIso();
     const change = () => {
       if (dirty && !confirm('تغییرات ذخیره نشده‌اند. از تغییر کلاس یا تاریخ مطمئن هستید؟')) {
         $('#attendance-class').value = previousClass;
-        $('#attendance-date').value = previousDate;
+        JalaliPicker.setIso($('#attendance-date'), previousDate);
         return;
       }
       previousClass = $('#attendance-class').value;
-      previousDate = $('#attendance-date').value;
+      previousDate = attendanceDateIso();
       load();
     };
     $('#attendance-class').onchange = change;
-    $('#attendance-date').onchange = change;
+    $('#attendance-date').addEventListener('jalali-change', change);
     $('#all-present').onclick = () => {
       $$('[data-student]').forEach((x) => (x.value = 'present'));
       dirty = true;
@@ -945,7 +1242,7 @@
       const btn = $('#attendance-save');
       btn.disabled = true;
       $('#attendance-class').disabled = true;
-      $('#attendance-date').disabled = true;
+      JalaliPicker.setDisabled($('#attendance-date'), true);
       $('#all-present').disabled = true;
       try {
         await API.saveAttendance({ classId: savedClass, date: savedDate, records });
@@ -960,7 +1257,7 @@
         if (version === routeVersion) {
           btn.disabled = false;
           $('#attendance-class').disabled = false;
-          $('#attendance-date').disabled = false;
+          JalaliPicker.setDisabled($('#attendance-date'), false);
           $('#all-present').disabled = false;
         }
       }
@@ -986,7 +1283,8 @@
       return;
     }
     if (version !== routeVersion) return;
-    $('#panel-body').innerHTML = `<div class="surface"><h2>ثبت یادداشت انضباطی</h2><form id="discipline-form"><div class="form-row"><label>کلاس<select id="discipline-class" required>${classOptions()}</select></label><label>دانش‌آموز<select id="discipline-student" required></select></label><label>نوع یادداشت<select name="type"><option value="positive">تشویق</option><option value="attention">نیاز به پیگیری</option></select></label><label>تاریخ<input name="date" type="date" value="${today()}" required></label></div><label class="form-stack">شرح یادداشت<textarea name="note" rows="3" minlength="3" maxlength="1000" placeholder="برای مثال: مشارکت خوب در حل تمرین گروهی" required></textarea></label><div class="save-bar"><button class="btn btn-green" id="discipline-save" type="submit" disabled>ثبت یادداشت</button><span id="discipline-form-status" role="status"></span></div></form></div><div class="surface"><h2>یادداشت‌های ثبت‌شده</h2><div id="discipline-records"></div></div>`;
+    $('#panel-body').innerHTML = `<div class="surface"><h2>ثبت یادداشت انضباطی</h2><form id="discipline-form"><div class="form-row"><label>کلاس<select id="discipline-class" required>${classOptions()}</select></label><label>دانش‌آموز<select id="discipline-student" required></select></label><label>نوع یادداشت<select name="type"><option value="positive">تشویق</option><option value="attention">نیاز به پیگیری</option></select></label><label>تاریخ<span data-jalali-date="date" data-value="${today()}" data-required></span></label></div><label class="form-stack">شرح یادداشت<textarea name="note" rows="3" minlength="3" maxlength="1000" placeholder="برای مثال: مشارکت خوب در حل تمرین گروهی" required></textarea></label><div class="save-bar"><button class="btn btn-green" id="discipline-save" type="submit" disabled>ثبت یادداشت</button><span id="discipline-form-status" role="status"></span></div></form></div><div class="surface"><h2>یادداشت‌های ثبت‌شده</h2><div id="discipline-records"></div></div>`;
+    upgradeJalaliFields($('#discipline-form'));
     let studentLoad = 0;
     const loadStudents = async () => {
       const op = ++studentLoad;
@@ -1053,89 +1351,71 @@
   }
 
   async function renderSchedule(version) {
-    if (!school.id) {
-      $('#panel-body').innerHTML =
-        '<div class="notice">برای برنامهٔ هفتگی ابتدا مدرسه را تنظیم کنید.</div><a href="#panel/settings" class="btn btn-green">تنظیمات مدرسه ←</a>';
+    const body = $('#panel-body');
+    try {
+      schools = await API.schools();
+    } catch (e) {
+      body.innerHTML = error(e);
       return;
     }
-    if (!classes.length) {
-      $('#panel-body').innerHTML = noClassesNotice();
+    if (!schools.length) {
+      body.innerHTML =
+        '<div class="notice">برای ثبت برنامه، ابتدا یک مدرسه بسازید.</div><a href="#panel/settings" class="btn btn-green">تنظیمات مدرسه ←</a>';
       return;
+    }
+    const scopeSchoolId = sessionsScopeSchoolId();
+    if (!scopeSchoolId) {
+      body.innerHTML =
+        '<div class="notice">مدرسهٔ فعال مشخص نیست.</div><a href="#panel/settings" class="btn btn-green">انتخاب مدرسه ←</a>';
+      return;
+    }
+    if (
+      sessionsPageClassId &&
+      sessionsClassesCache.length &&
+      !sessionsClassesCache.some((c) => String(c.id) === String(sessionsPageClassId))
+    ) {
+      sessionsPageClassId = '';
     }
     try {
-      schedule = await API.schedule();
+      sessionsPageCache = await fetchSessionsForFilter(scopeSchoolId, sessionsPageClassId);
     } catch (e) {
-      $('#panel-body').innerHTML = error(e);
+      body.innerHTML = error(e);
       return;
     }
     if (version !== routeVersion) return;
-    $('#panel-body').innerHTML = `<div class="surface"><h2>افزودن به برنامه هفتگی</h2><form id="schedule-form"><div class="form-row"><label>کلاس<select name="classId" required>${classOptions()}</select></label><label>روز<select name="day">${dayOptions()}</select></label><label>از ساعت<input name="start" type="time" value="08:00" required></label><label>تا ساعت<input name="end" type="time" value="09:30" required></label><label>موضوع جلسه<input name="topic" maxlength="100" required placeholder="مثلاً حل تمرین تابع"></label><button type="submit" class="btn btn-green">افزودن</button></div></form></div><div id="schedule-table"></div>`;
-    const table = () => {
-      $('#schedule-table').innerHTML = schedule.length
-        ? `<div class="table-wrap"><table><thead><tr><th>روز</th><th>کلاس</th><th>ساعت</th><th>موضوع</th><th>عملیات</th></tr></thead><tbody>${[...schedule]
-          .sort((a, b) => a.day - b.day || a.start.localeCompare(b.start))
-          .map(
-            (s) =>
-              `<tr><td>${days[s.day]}</td><td>${esc(classBy(s.classId)?.title || '')}</td><td>${fa(s.start)} تا ${fa(s.end)}</td><td>${esc(s.topic)}</td><td><button class="danger-link" data-remove="${esc(s.id)}" aria-label="حذف جلسه ${esc(s.topic)}">حذف</button></td></tr>`
-          )
-          .join('')}</tbody></table></div>`
-        : '<p class="empty">هنوز برنامه‌ای ثبت نشده است.</p>';
-    };
-    table();
-    $('#schedule-form').onsubmit = async (e) => {
-      e.preventDefault();
-      const d = new FormData(e.target),
-        body = {
-          classId: d.get('classId'),
-          day: Number(d.get('day')),
-          start: d.get('start'),
-          end: d.get('end'),
-          topic: d.get('topic').trim(),
-        };
-      if (!body.topic) {
-        toast('موضوع جلسه را وارد کنید.');
-        return;
-      }
-      if (body.start >= body.end) {
-        toast('ساعت پایان باید بعد از ساعت شروع باشد.');
-        return;
-      }
-      if (schedule.some((s) => s.day === body.day && s.start < body.end && body.start < s.end)) {
-        toast('این بازه با یکی از کلاس‌های مدرس تداخل دارد.');
-        return;
-      }
-      const btn = $('button[type="submit"]', e.target);
-      btn.disabled = true;
+    if (!sessionsClassesCache.length) {
+      body.innerHTML = noClassesNotice();
+      return;
+    }
+    body.innerHTML = `<div class="surface classes-page"><div class="classes-toolbar"><div class="form-row classes-filters"><label>کلاس<select id="session-filter-class">${sessionClassFilterOptions(sessionsPageClassId)}</select></label><label class="classes-search-wrap">جستجو<div class="search classes-search"><span aria-hidden="true">⌕</span><input id="session-search" type="search" placeholder="کلاس، موضوع یا تاریخ…" value="${esc(sessionsSearch)}" autocomplete="off"></div></label></div><button type="button" class="btn btn-green" id="session-create-open">جلسه جدید +</button></div><div id="sessions-table-host"></div><div id="sessions-pagination" class="pagination"></div></div>`;
+    const reloadCache = async () => {
+      const sid = sessionsScopeSchoolId();
+      sessionsPageCache = await fetchSessionsForFilter(sid, sessionsPageClassId);
+      const sel = $('#session-filter-class');
+      if (sel) sel.innerHTML = sessionClassFilterOptions(sessionsPageClassId);
       try {
-        const item = await API.addSchedule(body);
-        schedule.push(item);
-        if (version === routeVersion) {
-          table();
-          toast('جلسه به برنامه اضافه شد.');
-        }
-      } catch (e) {
-        toast(e.message);
-      } finally {
-        btn.disabled = false;
+        sessionsOverviewCount = (await API.sessions(sid, '')).length;
+      } catch {
+        /* keep previous count */
       }
+      paintSessionsTable();
     };
-    $('#schedule-table').onclick = async (e) => {
-      const btn = e.target.closest('[data-remove]');
-      if (!btn) return;
-      if (!confirm('این جلسه از برنامه هفتگی حذف شود؟')) return;
-      btn.disabled = true;
+    $('#session-filter-class').onchange = async () => {
+      sessionsPageClassId = $('#session-filter-class').value;
+      sessionsListPage = 1;
       try {
-        await API.removeSchedule(btn.dataset.remove);
-        schedule = schedule.filter((x) => x.id !== btn.dataset.remove);
-        if (version === routeVersion) {
-          table();
-          toast('جلسه حذف شد.');
-        }
-      } catch (e) {
-        toast(e.message);
-        btn.disabled = false;
+        await reloadCache();
+      } catch (err) {
+        toast(err.message);
       }
     };
+    $('#session-search').oninput = (e) => {
+      sessionsSearch = e.target.value;
+      sessionsListPage = 1;
+      paintSessionsTable();
+    };
+    $('#session-create-open').onclick = openSessionCreateModal;
+    paintSessionsTable();
   }
 
   async function renderSettings() {

@@ -15,4 +15,9 @@ var (
 	StudentNotFound       = messages.NewMessageByError(404_401, "دانش‌آموز یافت نشد.")
 	InvalidStudentInput   = messages.NewMessageByError(422_401, "اطلاعات دانش‌آموز نامعتبر است.")
 	NationalCodeTaken     = messages.NewMessageByError(409_401, "این کد ملی قبلاً ثبت شده است.")
+
+	SessionNotFound      = messages.NewMessageByError(404_501, "جلسه یافت نشد.")
+	InvalidSessionInput  = messages.NewMessageByError(422_501, "اطلاعات جلسه نامعتبر است.")
+	SessionDayMismatch   = messages.NewMessageByError(422_502, "روز هفته با تاریخ جلسه (تهران) هم‌خوان نیست.")
+	SessionTimeOverlap   = messages.NewMessageByError(409_501, "این بازه با جلسهٔ دیگری در همان روز تداخل دارد.")
 )

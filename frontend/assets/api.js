@@ -82,7 +82,41 @@
         body: { title: body.title, grade: body.grade, room: body.room || '', id: body.id },
       }),
     deleteClass: (classId) => request('/class?classId=' + enc(classId), { method: 'DELETE', body: {} }),
-    schedule: () => Promise.resolve([]),
+    sessions: (schoolId, classId) => {
+      const q = [];
+      if (classId) q.push('classId=' + enc(String(classId)));
+      else if (schoolId) q.push('schoolId=' + enc(String(schoolId)));
+      if (!q.length) return Promise.resolve([]);
+      return request('/sessions?' + q.join('&'));
+    },
+    weeklySession: (sessionId) => request('/session?sessionId=' + enc(sessionId)),
+    createSession: (body, classId) => {
+      const q = ['classId=' + enc(String(classId))];
+      if (activeSchoolId) q.push('schoolId=' + enc(activeSchoolId));
+      return request('/session?' + q.join('&'), {
+        method: 'POST',
+        body: {
+          sessionDate: body.sessionDate,
+          day: body.day,
+          startTime: body.startTime,
+          endTime: body.endTime,
+          subject: body.subject || '',
+        },
+      });
+    },
+    saveSession: (body) =>
+      request('/session?sessionId=' + enc(body.id || ''), {
+        method: 'PATCH',
+        body: {
+          sessionDate: body.sessionDate,
+          day: body.day,
+          startTime: body.startTime,
+          endTime: body.endTime,
+          subject: body.subject || '',
+          id: body.id,
+        },
+      }),
+    deleteSession: (sessionId) => request('/session?sessionId=' + enc(sessionId), { method: 'DELETE', body: {} }),
     courses: () => Promise.resolve([]),
     students: (classId) => {
       if (!classId) return Promise.resolve([]);
@@ -104,8 +138,6 @@
         },
       }),
     deleteStudent: (studentId) => request('/student?studentId=' + enc(studentId), { method: 'DELETE', body: {} }),
-    addSchedule: notImplemented('برنامه کلاسی'),
-    removeSchedule: notImplemented('برنامه کلاسی'),
     attendance: notImplemented('حضور و غیاب'),
     saveAttendance: notImplemented('حضور و غیاب'),
     discipline: () => Promise.resolve([]),
